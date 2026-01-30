@@ -93,7 +93,7 @@ function App() {
 
         map.current.addSource('all-routes', {
             type: 'geojson',
-            data: '/routes_data/all_routes.geojson',
+            data: `${import.meta.env.BASE_URL}routes_data/all_routes.geojson`,
             promoteId: 'shape_id'
         });
         map.current.addLayer({
@@ -303,7 +303,7 @@ function App() {
     useEffect(() => {
         setIsLoading(true);
         setError(null);
-        fetch('/routes_data/routes_index.json')
+        fetch(`${import.meta.env.BASE_URL}routes_data/routes_index.json`)
             .then(res => {
                 if (!res.ok) throw new Error('Failed to fetch routes');
                 return res.json();
@@ -325,7 +325,7 @@ function App() {
         if (selectedRouteIds.size === 1) {
             const routeId = Array.from(selectedRouteIds)[0];
             const safeId = sanitizeRouteId(routeId);
-            fetch(`/routes_data/${safeId}.json`)
+            fetch(`${import.meta.env.BASE_URL}routes_data/${safeId}.json`)
                 .then(res => res.json())
                 .then(data => {
                     if (map.current && data.features.length > 0) {
@@ -445,7 +445,7 @@ function App() {
         <div className="app-container">
             <div className="sidebar">
                 <div className="sidebar-header">
-                    <img src="/PDP_logo.png" alt="¿Por Dónde Pasa?" className="logo" />
+                    <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
                 </div>
                 <div className="instructions-section">
                     <div
@@ -627,7 +627,7 @@ function App() {
                         </div>
                         <div className="modal-body">
                             <div className="modal-logo-column">
-                                <img src="/PDP_logo.png" alt="¿Por Dónde Pasa?" className="modal-logo" />
+                                <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="modal-logo" />
                             </div>
                             <div className="modal-text-column">
                                 <p>{t.aboutDescription}</p>
