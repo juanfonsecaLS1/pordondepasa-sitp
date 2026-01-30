@@ -46,8 +46,8 @@ export const TRANSLATIONS = {
         aboutTitle: "Acerca de esta aplicación",
         aboutDescription: "Esta aplicación permite explorar de manera interactiva las rutas del SITP de Bogotá, Colombia, como una herramienta simple e intuitiva para que ciudadanos y visitantes logremos entender mejor el sistema de transporte público.",
         aboutCreator: "Creado por Juan Fonseca con ayuda de Gemini, usando datos del sistema [TRANSMILENIO](https://datosabiertos-transmilenio.hub.arcgis.com/)",
-        githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/gtfs-app)",
-        githubIssues: "Reportar un problema: [Issues](https://github.com/juanfonsecaLS1/gtfs-app/issues)",
+        githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/pordondepasa-sitp)",
+        githubIssues: "Reportar un problema: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Cerrar",
         noRoutesAtLocation: "No se encontraron rutas en esta ubicación"
     },
@@ -75,8 +75,8 @@ export const TRANSLATIONS = {
         aboutTitle: "About this Application",
         aboutDescription: "This application allows users to interactively explore the routes of the SITP in Bogotá, Colombia, as a simple and intuitive tool so that citizens and visitors can better understand the public transport system.",
         aboutCreator: "Created by Juan Fonseca with the help of Gemini, using data from the [TRANSMILENIO system](https://datosabiertos-transmilenio.hub.arcgis.com/)",
-        githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/gtfs-app)",
-        githubIssues: "Report an issue: [Issues](https://github.com/juanfonsecaLS1/gtfs-app/issues)",
+        githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/pordondepasa-sitp)",
+        githubIssues: "Report an issue: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Close",
         noRoutesAtLocation: "No routes found at this location"
     }
