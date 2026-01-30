@@ -303,7 +303,7 @@ html,
 /* Map Legend - Minimalist */
 .map-legend {
   position: absolute;
-  bottom: 24px;
+  bottom: 40px;
   right: 24px;
   background: var(--sidebar-bg);
   padding: var(--space-lg);
@@ -326,10 +326,15 @@ html,
   color: var(--text-secondary);
 }
 
+.legend-items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-xs) var(--space-md);
+}
+
 .legend-item {
   display: flex;
   align-items: center;
-  margin-bottom: var(--space-xs);
   font-size: 0.8125rem;
 }
 
@@ -493,10 +498,35 @@ button {
 
 .modal-text-column p {
   margin: 0 0 var(--space-lg) 0;
+  line-height: 1.6;
 }
 
 .modal-text-column p:last-child {
   margin-bottom: 0;
+}
+
+.modal-text-column .instructions-narrative {
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--text-main);
+  margin: 0 0 var(--space-xl) 0;
+}
+
+.modal-text-column .instructions-label {
+  font-size: 0.875rem;
+  margin: var(--space-xl) 0 var(--space-md) 0;
+  color: var(--text-main);
+}
+
+.modal-text-column .instructions-list {
+  margin: 0 0 var(--space-xl) 0;
+}
+
+.modal-text-column .instructions-list li {
+  font-size: 0.875rem;
+  color: var(--text-main);
+  margin-bottom: var(--space-md);
+  line-height: 1.6;
 }
 
 .modal-text-column a {

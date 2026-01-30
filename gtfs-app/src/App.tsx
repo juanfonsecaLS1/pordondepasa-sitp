@@ -37,7 +37,7 @@ function App() {
 
     const [theme, setTheme] = useState<Theme>(() => {
         const saved = localStorage.getItem('theme');
-        return (saved === 'light' || saved === 'dark') ? saved : 'light';
+        return (saved === 'light' || saved === 'dark') ? saved : 'dark';
     });
     const [lang, setLang] = useState<Language>(() => {
         const saved = localStorage.getItem('language');
@@ -46,8 +46,7 @@ function App() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [showAbout, setShowAbout] = useState(false);
-    const [showInstructions, setShowInstructions] = useState(true);
+    const [showAbout, setShowAbout] = useState(true);
     const [showToast, setShowToast] = useState(false);
 
     const debouncedFilter = useDebounce(filter, 300);
@@ -106,7 +105,7 @@ function App() {
                 'line-sort-key': 0
             },
             paint: {
-                'line-color': ['get', 'route_color'],
+                'line-color': '#1e90ff',
                 'line-width': 2,
                 'line-opacity': 0.3
             }
@@ -153,19 +152,26 @@ function App() {
 
         if (hasSelection) {
             const selectedMeta = routesRef.current.filter(r => selectedRouteIdsRef.current.has(r.route_id));
-            const uniqueShortNames = Array.from(new Set(selectedMeta.map(r => r.route_short_name)));
+            // Sort to match the order used in sidebar and legend
+            const sortedUniqueShortNames = Array.from(
+                new Set(
+                    selectedMeta
+                        .map(r => r.route_short_name)
+                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                )
+            );
             const matchExpression: any = ['match', ['get', 'route_id']];
 
             selectedMeta.forEach(route => {
-                const colorIndex = uniqueShortNames.indexOf(route.route_short_name);
+                const colorIndex = sortedUniqueShortNames.indexOf(route.route_short_name);
                 const color = SELECTION_COLORS[colorIndex % SELECTION_COLORS.length];
                 matchExpression.push(route.route_id);
                 matchExpression.push(color);
             });
-            matchExpression.push(['get', 'route_color']);
+            matchExpression.push('#1e90ff');
             map.current.setPaintProperty('routes-layer', 'line-color', matchExpression);
         } else {
-            map.current.setPaintProperty('routes-layer', 'line-color', ['get', 'route_color']);
+            map.current.setPaintProperty('routes-layer', 'line-color', '#1e90ff');
         }
 
         const sortExpression: any = [
@@ -245,9 +251,32 @@ function App() {
             });
             setSelectedRouteIds(newSelection);
 
-            // Collapse instructions on any selection
+            // Zoom to fit selected routes
             if (newSelection.size > 0) {
-                setShowInstructions(false);
+                const selectedFeatures = features.filter(f => newSelection.has(f.properties.route_id));
+                if (selectedFeatures.length > 0 && map.current) {
+                    const bounds = new maplibregl.LngLatBounds();
+
+                    // Include all selected route coordinates
+                    selectedFeatures.forEach(feature => {
+                        if (feature.geometry.type === 'LineString') {
+                            feature.geometry.coordinates.forEach((coord: [number, number]) => {
+                                bounds.extend(coord);
+                            });
+                        } else if (feature.geometry.type === 'MultiLineString') {
+                            feature.geometry.coordinates.forEach((line: [number, number][]) => {
+                                line.forEach((coord: [number, number]) => {
+                                    bounds.extend(coord);
+                                });
+                            });
+                        }
+                    });
+
+                    map.current.fitBounds(bounds, {
+                        padding: 80,
+                        duration: 1000
+                    });
+                }
             }
 
             // Show toast if no routes found
@@ -344,8 +373,6 @@ function App() {
     const handleSidebarSelect = (routeId: string) => {
         setMarkerLocation(null);
         setSidebarHoveredId(null);
-        // Collapse instructions when user selects a route
-        setShowInstructions(false);
         // Logic for Sidebar Selection:
         // Always collapse "All Services" to focus on "Selected Routes" section which will appear
         setIsAllServicesExpanded(false);
@@ -384,6 +411,7 @@ function App() {
             );
     }, [routes, selectedRouteIds]);
 
+    // Sorted unique short names - used for consistent color assignment across map, sidebar, and legend
     const uniqueSelectedShortNames = useMemo(() => {
         return Array.from(new Set(selectedRoutesList.map(r => r.route_short_name)));
     }, [selectedRoutesList]);
@@ -447,37 +475,6 @@ function App() {
                 <div className="sidebar-header">
                     <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
                 </div>
-                <div className="instructions-section">
-                    <div
-                        className="instructions-header"
-                        onClick={() => setShowInstructions(!showInstructions)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setShowInstructions(!showInstructions);
-                            }
-                        }}
-                        aria-expanded={showInstructions}
-                    >
-                        <h3>{t.introduction}</h3>
-                        <span>{showInstructions ? '▲' : '▼'}</span>
-                    </div>
-                    {showInstructions && (
-                        <div className="instructions-content">
-                            <p className="instructions-narrative" dangerouslySetInnerHTML={{
-                                __html: t.narrative.replace(/^['\u00bf]([^'\u00bf?]+)[?']/, "<em>'$1?'</em>")
-                            }} />
-                            <p className="instructions-label"><strong>{t.howToUseLabel}</strong></p>
-                            <ul className="instructions-list">
-                                <li>{t.instruction1}</li>
-                                <li>{t.instruction2}</li>
-                                <li>{t.instruction3}</li>
-                            </ul>
-                        </div>
-                    )}
-                </div>
 
                 {/* Section: Selected Routes (Conditional on Selection Existence) */}
                 {selectedRoutesList.length > 0 && (
@@ -501,17 +498,13 @@ function App() {
                 {/* Section: All Services */}
                 <div
                     className="section-header"
-                    onClick={() => {
-                        setIsAllServicesExpanded(!isAllServicesExpanded);
-                        setShowInstructions(false);
-                    }}
+                    onClick={() => setIsAllServicesExpanded(!isAllServicesExpanded)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
                             setIsAllServicesExpanded(!isAllServicesExpanded);
-                            setShowInstructions(false);
                         }
                     }}
                     aria-expanded={isAllServicesExpanded}
@@ -598,15 +591,17 @@ function App() {
                 {selectedRouteIds.size > 0 && (
                     <div className="map-legend">
                         <div className="legend-title">{t.legendTitle}</div>
-                        {uniqueSelectedShortNames.map((code, idx) => (
-                            <div key={code} className="legend-item">
-                                <span
-                                    className="legend-color"
-                                    style={{ backgroundColor: SELECTION_COLORS[idx % SELECTION_COLORS.length] }}
-                                />
-                                <span>{code}</span>
-                            </div>
-                        ))}
+                        <div className="legend-items">
+                            {uniqueSelectedShortNames.map((code, idx) => (
+                                <div key={code} className="legend-item">
+                                    <span
+                                        className="legend-color"
+                                        style={{ backgroundColor: SELECTION_COLORS[idx % SELECTION_COLORS.length] }}
+                                    />
+                                    <span>{code}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -630,13 +625,22 @@ function App() {
                                 <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="modal-logo" />
                             </div>
                             <div className="modal-text-column">
+                                <p className="instructions-narrative" dangerouslySetInnerHTML={{
+                                    __html: t.narrative.replace(/^['¿]([^'¿?]+)[?']/, "<em>'$1?'</em>")
+                                }} />
                                 <p>{t.aboutDescription}</p>
+                                <p className="instructions-label"><strong>{t.howToUseLabel}</strong></p>
+                                <ul className="instructions-list">
+                                    <li>{t.instruction1}</li>
+                                    <li>{t.instruction2}</li>
+                                    <li>{t.instruction3}</li>
+                                </ul>
                                 <p><strong dangerouslySetInnerHTML={{
                                     __html: t.aboutCreator.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
                                 }} /></p>
                                 <div className="modal-links">
                                     <a
-                                        href="https://github.com/juanfonsecaLS1/gtfs-app"
+                                        href="https://github.com/juanfonsecaLS1/pordondepasa-sitp"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="github-link"
