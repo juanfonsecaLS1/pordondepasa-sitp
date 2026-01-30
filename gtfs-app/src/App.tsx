@@ -260,13 +260,13 @@ function App() {
                     // Include all selected route coordinates
                     selectedFeatures.forEach(feature => {
                         if (feature.geometry.type === 'LineString') {
-                            feature.geometry.coordinates.forEach((coord: [number, number]) => {
-                                bounds.extend(coord);
+                            feature.geometry.coordinates.forEach(coord => {
+                                bounds.extend(coord as [number, number]);
                             });
                         } else if (feature.geometry.type === 'MultiLineString') {
-                            feature.geometry.coordinates.forEach((line: [number, number][]) => {
-                                line.forEach((coord: [number, number]) => {
-                                    bounds.extend(coord);
+                            feature.geometry.coordinates.forEach(line => {
+                                line.forEach(coord => {
+                                    bounds.extend(coord as [number, number]);
                                 });
                             });
                         }
