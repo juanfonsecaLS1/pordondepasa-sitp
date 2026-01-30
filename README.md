@@ -13,7 +13,7 @@ To enable the deployment, configure the repository settings:
 1. Go to **Settings** → **Pages** in your GitHub repository
 2. Under **Build and deployment**:
    - Set **Source** to: `GitHub Actions`
-3. The workflow will automatically deploy when changes are pushed to the `main` branch
+3. The workflow will automatically deploy when changes are pushed to the `master` branch
 
 ### Manual Deployment
 
