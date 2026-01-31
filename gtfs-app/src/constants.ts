@@ -45,11 +45,14 @@ export const TRANSLATIONS = {
         aboutButton: "Acerca de",
         aboutTitle: "Acerca de esta aplicación",
         aboutDescription: "Esta aplicación permite explorar de manera interactiva las rutas del SITP de Bogotá, Colombia, de forma simple e intuitiva (¡ojalá!) para que ciudadanos y visitantes logremos entender mejor el sistema de transporte público.",
-        aboutCreator: "Creado por Juan Fonseca con ayuda de Gemini, usando datos del sistema [TRANSMILENIO](https://datosabiertos-transmilenio.hub.arcgis.com/)",
+        aboutCreator: "Creado por Juan Fonseca con ayuda de Gemini, usando datos del sistema [TRANSMILENIO](https://datosabiertos-transmilenio.hub.arcgis.com/) (2025-10-28)",
+        aboutLicense: "Licencia: MIT",
+        aboutYear: "© 2026",
         githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/pordondepasa-sitp)",
         githubIssues: "Reportar un problema: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Cerrar",
-        noRoutesAtLocation: "No se encontraron rutas en esta ubicación"
+        noRoutesAtLocation: "No se encontraron rutas en esta ubicación",
+        smallScreenWarning: "Para una mejor experiencia, se recomienda usar una pantalla más grande"
     },
     en: {
         title: "Where does it go?",
@@ -74,11 +77,14 @@ export const TRANSLATIONS = {
         aboutButton: "About",
         aboutTitle: "About this Application",
         aboutDescription: "This application allows users to interactively explore the routes of the SITP in Bogotá, Colombia, in a simple and intuitive way (hopefully!) so that citizens and visitors can better understand the public transport system.",
-        aboutCreator: "Created by Juan Fonseca with the help of Gemini, using data from the [TRANSMILENIO system](https://datosabiertos-transmilenio.hub.arcgis.com/)",
+        aboutCreator: "Created by Juan Fonseca with the help of Gemini, using data from the [TRANSMILENIO system](https://datosabiertos-transmilenio.hub.arcgis.com/) (2025-10-28)",
+        aboutLicense: "License: MIT",
+        aboutYear: "© 2026",
         githubRepo: "GitHub: [github.com/juanfonsecaLS1/gtfs-app](https://github.com/juanfonsecaLS1/pordondepasa-sitp)",
         githubIssues: "Report an issue: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Close",
-        noRoutesAtLocation: "No routes found at this location"
+        noRoutesAtLocation: "No routes found at this location",
+        smallScreenWarning: "For a better experience, please use a larger screen"
     }
 } as const;
 

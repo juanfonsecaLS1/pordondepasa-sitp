@@ -471,6 +471,11 @@ function App() {
 
     return (
         <div className="app-container">
+            {/* Small Screen Warning */}
+            <div className="small-screen-warning">
+                <p>{t.smallScreenWarning}</p>
+            </div>
+
             <div className="sidebar">
                 <div className="sidebar-header">
                     <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
@@ -638,6 +643,9 @@ function App() {
                                 <p><strong dangerouslySetInnerHTML={{
                                     __html: t.aboutCreator.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
                                 }} /></p>
+                                <p className="about-metadata">
+                                    {t.aboutLicense} • {t.aboutYear}
+                                </p>
                                 <div className="modal-links">
                                     <a
                                         href="https://github.com/juanfonsecaLS1/pordondepasa-sitp"

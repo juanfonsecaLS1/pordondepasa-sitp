@@ -71,6 +71,35 @@ html,
   width: 100vw;
 }
 
+/* Small Screen Warning */
+.small-screen-warning {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .small-screen-warning {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-color);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2xl);
+    text-align: center;
+  }
+
+  .small-screen-warning p {
+    font-size: 1.125rem;
+    color: var(--text-main);
+    line-height: 1.6;
+    max-width: 400px;
+  }
+}
+
 /* Sidebar */
 .sidebar {
   width: 320px;
@@ -426,7 +455,7 @@ button {
 .modal-content {
   background: var(--sidebar-bg);
   border-radius: 12px;
-  max-width: 680px;
+  max-width: 782px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
@@ -536,6 +565,12 @@ button {
 
 .modal-text-column a:hover {
   text-decoration: underline;
+}
+
+.about-metadata {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: var(--space-md) 0 !important;
 }
 
 .modal-links {
