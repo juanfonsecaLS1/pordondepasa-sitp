@@ -203,7 +203,22 @@ function App() {
             setIsAllServicesExpanded(false);
             if (!markerRef.current) {
                 if (map.current) {
-                    markerRef.current = new maplibregl.Marker()
+                    // Create a custom marker element using an img tag for better quality
+                    const el = document.createElement('div');
+                    el.className = 'custom-marker';
+                    el.style.width = '40px';
+                    el.style.height = '48px';
+                    el.style.cursor = 'pointer';
+
+                    const img = document.createElement('img');
+                    img.src = `${import.meta.env.BASE_URL}map_marker.png`;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'contain';
+                    img.style.imageRendering = 'high-quality';
+                    el.appendChild(img);
+
+                    markerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' })
                         .setLngLat(markerLocation)
                         .addTo(map.current);
                 }
@@ -331,34 +346,6 @@ function App() {
                 if (rid) newSelection.add(rid);
             });
             setSelectedRouteIds(newSelection);
-
-            // Zoom to fit selected routes
-            if (newSelection.size > 0) {
-                const selectedFeatures = features.filter(f => newSelection.has(f.properties.route_id));
-                if (selectedFeatures.length > 0 && map.current) {
-                    const bounds = new maplibregl.LngLatBounds();
-
-                    // Include all selected route coordinates
-                    selectedFeatures.forEach(feature => {
-                        if (feature.geometry.type === 'LineString') {
-                            feature.geometry.coordinates.forEach(coord => {
-                                bounds.extend([coord[0], coord[1]]);
-                            });
-                        } else if (feature.geometry.type === 'MultiLineString') {
-                            feature.geometry.coordinates.forEach(line => {
-                                line.forEach(coord => {
-                                    bounds.extend([coord[0], coord[1]]);
-                                });
-                            });
-                        }
-                    });
-
-                    map.current.fitBounds(bounds, {
-                        padding: 80,
-                        duration: 1000
-                    });
-                }
-            }
 
             // Show toast if no routes found
             if (newSelection.size === 0) {
