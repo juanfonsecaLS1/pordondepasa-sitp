@@ -224,60 +224,76 @@ function App() {
         if (urlLoaded || !map.current || routes.length === 0) return;
 
         const locationParams = parseLocationFromURL();
-        if (locationParams) {
-            const { lat, lng, routes: routeIds } = locationParams;
-
+        if (!locationParams) return;
+        
+        const { lat, lng, routes: routeIds } = locationParams;
+        
+        // Wait for map to be fully loaded
+        const loadFromURL = () => {
+            if (!map.current || !map.current.getLayer('routes-layer')) return;
+            
             // Set marker location
             setMarkerLocation({ lat, lng });
-
-            // Simulate click to query routes at this location
-            const point = map.current.project([lng, lat]);
-            const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
-                [point.x - BUFFER_PIXELS, point.y - BUFFER_PIXELS],
-                [point.x + BUFFER_PIXELS, point.y + BUFFER_PIXELS]
-            ];
-            const features = map.current.queryRenderedFeatures(bbox, { layers: ['routes-layer'] });
-
-            let newSelection = new Set<string>();
-
-            // If specific routes provided in URL, use those
-            if (routeIds && routeIds.length > 0) {
-                const routeIdsSet = new Set(routeIds);
-                features.forEach(f => {
-                    const rid = f.properties.route_id;
-                    if (rid && routeIdsSet.has(rid)) {
-                        newSelection.add(rid);
-                    }
-                });
-
-                // If no matches, fall back to all routes at location
-                if (newSelection.size === 0) {
-                    features.forEach(f => {
-                        const rid = f.properties.route_id;
-                        if (rid) newSelection.add(rid);
-                    });
-                }
-            } else {
-                // No specific routes, use all at location
-                features.forEach(f => {
-                    const rid = f.properties.route_id;
-                    if (rid) newSelection.add(rid);
-                });
-            }
-
-            setSelectedRouteIds(newSelection);
-
-            // Zoom to location
+            
+            // Zoom to location first
             map.current.flyTo({
                 center: [lng, lat],
                 zoom: 14,
                 duration: 1500
             });
-
+            
+            // Wait for map to settle before querying features
+            setTimeout(() => {
+                if (!map.current) return;
+                
+                const point = map.current.project([lng, lat]);
+                const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
+                    [point.x - BUFFER_PIXELS, point.y - BUFFER_PIXELS],
+                    [point.x + BUFFER_PIXELS, point.y + BUFFER_PIXELS]
+                ];
+                const features = map.current.queryRenderedFeatures(bbox, { layers: ['routes-layer'] });
+                
+                let newSelection = new Set<string>();
+                
+                // If specific routes provided in URL, use those
+                if (routeIds && routeIds.length > 0) {
+                    const routeIdsSet = new Set(routeIds);
+                    features.forEach(f => {
+                        const rid = f.properties.route_id;
+                        if (rid && routeIdsSet.has(rid)) {
+                            newSelection.add(rid);
+                        }
+                    });
+                    
+                    // If no matches, fall back to all routes at location
+                    if (newSelection.size === 0) {
+                        features.forEach(f => {
+                            const rid = f.properties.route_id;
+                            if (rid) newSelection.add(rid);
+                        });
+                    }
+                } else {
+                    // No specific routes, use all at location
+                    features.forEach(f => {
+                        const rid = f.properties.route_id;
+                        if (rid) newSelection.add(rid);
+                    });
+                }
+                
+                setSelectedRouteIds(newSelection);
+            }, 2000); // Wait for fly animation to complete
+            
             // Close about modal if opened from URL
             setShowAbout(false);
-
             setUrlLoaded(true);
+        };
+        
+        // Check if map is ready
+        if (map.current.isStyleLoaded() && map.current.getLayer('routes-layer')) {
+            loadFromURL();
+        } else {
+            // Wait for style to load
+            map.current.once('idle', loadFromURL);
         }
     }, [routes, urlLoaded]);
 
