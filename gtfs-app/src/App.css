@@ -614,13 +614,37 @@ button {
   padding: var(--space-xl);
   border-top: 1px solid var(--border-color);
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
+  gap: var(--space-lg);
 }
 
 .modal-footer-link {
   font-size: 0.875rem;
   color: var(--text-secondary);
+  flex: 1;
+}
+
+.modal-controls {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.modal-control-button {
+  background: var(--sidebar-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.modal-control-button:hover {
+  opacity: 0.7;
 }
 
 .modal-footer-link a {

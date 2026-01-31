@@ -862,6 +862,22 @@ function App() {
                             <span className="modal-footer-link" dangerouslySetInnerHTML={{
                                 __html: t.githubIssues.replace(/\[([^\]]+)\]\(([^)]+)\)/, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
                             }} />
+                            <div className="modal-controls">
+                                <button
+                                    className="modal-control-button"
+                                    onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
+                                    aria-label={`Switch to ${lang === 'es' ? 'English' : 'Spanish'}`}
+                                >
+                                    {t.langLabel}
+                                </button>
+                                <button
+                                    className="modal-control-button"
+                                    onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                                    aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                                >
+                                    {theme === 'light' ? '🌙' : '☀️'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
