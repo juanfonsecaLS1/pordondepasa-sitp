@@ -41,7 +41,7 @@ export const TRANSLATIONS = {
         instruction1: "Pasa el cursor sobre el mapa para explorar rutas",
         instruction2: "Haz clic en el mapa para ver qué rutas pasan por una ubicación. Usa el panel lateral para explorar las rutas seleccionadas.",
         instruction3: "Busca rutas específicas en la sección 'Todos los servicios'",
-        narrative: "'¿Por dónde pasa?' es una pregunta común para quienes usan los buses en Bogotá. Esta herramienta fue creada para tratar de responder esa pregunta.",
+        narrative: "'¿Por dónde pasa?' es una pregunta común para quienes usamos los buses en Bogotá. Esta herramienta fue creada para tratar de responder esa pregunta.",
         aboutButton: "Acerca de",
         aboutTitle: "Acerca de esta aplicación",
         aboutDescription: "Esta aplicación permite explorar de manera interactiva las rutas del SITP de Bogotá, Colombia, de forma simple e intuitiva (¡ojalá!) para que ciudadanos y visitantes logremos entender mejor el sistema de transporte público.",
@@ -52,7 +52,10 @@ export const TRANSLATIONS = {
         githubIssues: "Reportar un problema: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Cerrar",
         noRoutesAtLocation: "No se encontraron rutas en esta ubicación",
-        smallScreenWarning: "Para una mejor experiencia, se recomienda usar una pantalla más grande"
+        smallScreenWarning: "Para una mejor experiencia, se recomienda usar una pantalla más grande",
+        shareButton: "Compartir ubicación",
+        linkCopied: "¡Enlace copiado al portapapeles!",
+        shareTooltip: "Generar enlace para compartir esta ubicación"
     },
     en: {
         title: "Where does it go?",
@@ -84,7 +87,10 @@ export const TRANSLATIONS = {
         githubIssues: "Report an issue: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Close",
         noRoutesAtLocation: "No routes found at this location",
-        smallScreenWarning: "For a better experience, please use a larger screen"
+        smallScreenWarning: "For a better experience, please use a larger screen",
+        shareButton: "Share location",
+        linkCopied: "Link copied to clipboard!",
+        shareTooltip: "Generate link to share this location"
     }
 } as const;
 

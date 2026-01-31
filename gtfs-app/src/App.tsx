@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 import { sanitizeRouteId } from './utils';
 import { useDebounce } from './hooks';
+import { parseLocationFromURL, generateShareURL, copyToClipboard } from './urlUtils';
 import {
     BOGOTA_BOUNDS,
     BOGOTA_CENTER,
@@ -48,6 +49,8 @@ function App() {
     const [error, setError] = useState<string | null>(null);
     const [showAbout, setShowAbout] = useState(true);
     const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+    const [urlLoaded, setUrlLoaded] = useState(false);
 
     const debouncedFilter = useDebounce(filter, 300);
 
@@ -216,6 +219,68 @@ function App() {
         updatePaintProperties();
     }, [markerLocation]);
 
+    // Load location from URL parameters on initial load
+    useEffect(() => {
+        if (urlLoaded || !map.current || routes.length === 0) return;
+
+        const locationParams = parseLocationFromURL();
+        if (locationParams) {
+            const { lat, lng, routes: routeIds } = locationParams;
+
+            // Set marker location
+            setMarkerLocation({ lat, lng });
+
+            // Simulate click to query routes at this location
+            const point = map.current.project([lng, lat]);
+            const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
+                [point.x - BUFFER_PIXELS, point.y - BUFFER_PIXELS],
+                [point.x + BUFFER_PIXELS, point.y + BUFFER_PIXELS]
+            ];
+            const features = map.current.queryRenderedFeatures(bbox, { layers: ['routes-layer'] });
+
+            let newSelection = new Set<string>();
+
+            // If specific routes provided in URL, use those
+            if (routeIds && routeIds.length > 0) {
+                const routeIdsSet = new Set(routeIds);
+                features.forEach(f => {
+                    const rid = f.properties.route_id;
+                    if (rid && routeIdsSet.has(rid)) {
+                        newSelection.add(rid);
+                    }
+                });
+
+                // If no matches, fall back to all routes at location
+                if (newSelection.size === 0) {
+                    features.forEach(f => {
+                        const rid = f.properties.route_id;
+                        if (rid) newSelection.add(rid);
+                    });
+                }
+            } else {
+                // No specific routes, use all at location
+                features.forEach(f => {
+                    const rid = f.properties.route_id;
+                    if (rid) newSelection.add(rid);
+                });
+            }
+
+            setSelectedRouteIds(newSelection);
+
+            // Zoom to location
+            map.current.flyTo({
+                center: [lng, lat],
+                zoom: 14,
+                duration: 1500
+            });
+
+            // Close about modal if opened from URL
+            setShowAbout(false);
+
+            setUrlLoaded(true);
+        }
+    }, [routes, urlLoaded]);
+
     useEffect(() => {
         if (map.current) return;
         if (!mapContainer.current) return;
@@ -281,6 +346,7 @@ function App() {
 
             // Show toast if no routes found
             if (newSelection.size === 0) {
+                setToastMessage(t.noRoutesAtLocation);
                 setShowToast(true);
                 // Auto-dismiss after 3 seconds and clear marker
                 setTimeout(() => {
@@ -388,6 +454,24 @@ function App() {
         setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedRouteIds(new Set());
+    };
+
+    const handleShare = async () => {
+        if (!markerLocation) return;
+
+        const routeIds = Array.from(selectedRouteIds);
+        const shareUrl = generateShareURL(
+            markerLocation.lat,
+            markerLocation.lng,
+            routeIds.length > 0 ? routeIds : undefined
+        );
+
+        const success = await copyToClipboard(shareUrl);
+        if (success) {
+            setToastMessage(t.linkCopied);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        }
     };
 
     const filteredRoutes = useMemo(() => {
@@ -567,6 +651,17 @@ function App() {
 
                 {/* Controls Container */}
                 <div style={{ position: 'absolute', top: '20px', right: '60px', zIndex: 1000, display: 'flex', gap: '10px' }}>
+                    {markerLocation && (
+                        <button
+                            className="theme-button"
+                            style={{ position: 'static' }}
+                            onClick={handleShare}
+                            aria-label={t.shareTooltip}
+                            title={t.shareTooltip}
+                        >
+                            🔗
+                        </button>
+                    )}
                     <button
                         className="theme-button"
                         style={{ position: 'static' }}
@@ -588,7 +683,7 @@ function App() {
                 {/* Toast Notification */}
                 {showToast && (
                     <div className="toast-notification">
-                        {t.noRoutesAtLocation}
+                        {toastMessage || t.noRoutesAtLocation}
                     </div>
                 )}
 
