@@ -43,7 +43,7 @@ function App() {
     const [filter, setFilter] = useState('');
     const [stopSearch, setStopSearch] = useState('');
     const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(new Set());
-    const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+    const [, setSelectedStop] = useState<Stop | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
     const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(true);
