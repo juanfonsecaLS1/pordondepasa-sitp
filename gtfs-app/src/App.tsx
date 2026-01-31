@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './App.css';
 import { sanitizeRouteId } from './utils';
 import { useDebounce } from './hooks';
+import { parseStopFromURL, updateURLWithStop, clearStopFromURL } from './urlUtils';
 import {
     BOGOTA_BOUNDS,
     BOGOTA_CENTER,
@@ -26,12 +27,26 @@ interface RouteMeta {
     route_text_color: string;
 }
 
+interface Stop {
+    stop_id: string;
+    stop_name: string;
+    stop_code: string;
+    stop_lat: number;
+    stop_lon: number;
+    routes: RouteMeta[];
+    route_count: number;
+}
+
 function App() {
     const [routes, setRoutes] = useState<RouteMeta[]>([]);
+    const [stops, setStops] = useState<Stop[]>([]);
     const [filter, setFilter] = useState('');
+    const [stopSearch, setStopSearch] = useState('');
     const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(new Set());
+    const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
+    const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(true);
     const [markerLocation, setMarkerLocation] = useState<{ lng: number, lat: number } | null>(null);
     const [sidebarHoveredId, setSidebarHoveredId] = useState<string | null>(null);
 
@@ -45,11 +60,15 @@ function App() {
     });
 
     const [isLoading, setIsLoading] = useState(true);
+    const [stopsLoading, setStopsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showAbout, setShowAbout] = useState(true);
     const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+    const [urlLoaded, setUrlLoaded] = useState(false);
 
     const debouncedFilter = useDebounce(filter, 300);
+    const debouncedStopSearch = useDebounce(stopSearch, 300);
 
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
@@ -84,6 +103,11 @@ function App() {
         if (!map.current) return;
         const styleUrl = MAP_STYLES[theme];
         map.current.setStyle(styleUrl);
+
+        // Re-add route layers when style changes
+        map.current.once('style.load', () => {
+            addRouteLayers();
+        });
     }, [theme]);
 
     const addRouteLayers = () => {
@@ -187,12 +211,12 @@ function App() {
     useEffect(() => {
         selectedRouteIdsRef.current = selectedRouteIds;
         updatePaintProperties();
-    }, [selectedRouteIds]);
+    }, [selectedRouteIds, updatePaintProperties]);
 
     useEffect(() => {
         sidebarHoveredIdRef.current = sidebarHoveredId;
         updatePaintProperties();
-    }, [sidebarHoveredId]);
+    }, [sidebarHoveredId, updatePaintProperties]);
 
     useEffect(() => {
         isMarkerActiveRef.current = !!markerLocation;
@@ -229,7 +253,55 @@ function App() {
             }
         }
         updatePaintProperties();
-    }, [markerLocation]);
+    }, [markerLocation, updatePaintProperties]);
+
+    // Load stop from URL parameters on initial load
+    useEffect(() => {
+        if (urlLoaded || !map.current || stops.length === 0) return;
+
+        const stopCode = parseStopFromURL();
+        if (!stopCode) return;
+
+        // Find stop by code (case-insensitive)
+        const stop = stops.find(s => s.stop_code.toUpperCase() === stopCode.toUpperCase());
+        if (!stop) {
+            console.warn(`Stop with code ${stopCode} not found`);
+            setUrlLoaded(true);
+            return;
+        }
+
+        // Wait for map to be fully loaded
+        const loadFromURL = () => {
+            if (!map.current || !map.current.getLayer('routes-layer')) return;
+
+            // Set selected stop
+            setSelectedStop(stop);
+            setMarkerLocation({ lng: stop.stop_lon, lat: stop.stop_lat });
+
+            // Select routes from stop
+            const routeIds = new Set(stop.routes.map(r => r.route_id));
+            setSelectedRouteIds(routeIds);
+
+            // Zoom to stop location
+            map.current.flyTo({
+                center: [stop.stop_lon, stop.stop_lat],
+                zoom: 15,
+                duration: 1500
+            });
+
+            // Close about modal if opened from URL
+            setShowAbout(false);
+            setUrlLoaded(true);
+        };
+
+        // Check if map is ready
+        if (map.current.isStyleLoaded() && map.current.getLayer('routes-layer')) {
+            loadFromURL();
+        } else {
+            // Wait for style to load
+            map.current.once('idle', loadFromURL);
+        }
+    }, [stops, urlLoaded]);
 
     useEffect(() => {
         if (map.current) return;
@@ -252,6 +324,11 @@ function App() {
 
         map.current.on('click', (e) => {
             if (!map.current) return;
+
+            // Clear stop selection and URL when clicking on map
+            setSelectedStop(null);
+            clearStopFromURL();
+
             setMarkerLocation(e.lngLat);
             const point = e.point;
             const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
@@ -268,6 +345,7 @@ function App() {
 
             // Show toast if no routes found
             if (newSelection.size === 0) {
+                setToastMessage(t.noRoutesAtLocation);
                 setShowToast(true);
                 // Auto-dismiss after 3 seconds and clear marker
                 setTimeout(() => {
@@ -335,6 +413,24 @@ function App() {
             });
     }, [t.error]);
 
+    // Load stops data
+    useEffect(() => {
+        setStopsLoading(true);
+        fetch(`${import.meta.env.BASE_URL}routes_data/stops_with_routes.json`)
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch stops');
+                return res.json();
+            })
+            .then(data => {
+                setStops(data);
+                setStopsLoading(false);
+            })
+            .catch(err => {
+                console.error("Failed to load stops", err);
+                setStopsLoading(false);
+            });
+    }, []);
+
     // Zoom logic
     useEffect(() => {
         if (!map.current || markerLocation) return;
@@ -360,6 +456,8 @@ function App() {
     const handleSidebarSelect = (routeId: string) => {
         setMarkerLocation(null);
         setSidebarHoveredId(null);
+        setSelectedStop(null);
+        clearStopFromURL();
         // Logic for Sidebar Selection:
         // Always collapse "All Services" to focus on "Selected Routes" section which will appear
         setIsAllServicesExpanded(false);
@@ -375,7 +473,36 @@ function App() {
         setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedRouteIds(new Set());
+        setSelectedStop(null);
+        clearStopFromURL();
     };
+
+    const handleStopSelect = (stop: Stop) => {
+        setSelectedStop(stop);
+        setMarkerLocation({ lng: stop.stop_lon, lat: stop.stop_lat });
+
+        // Select routes from stop
+        const routeIds = new Set(stop.routes.map(r => r.route_id));
+        setSelectedRouteIds(routeIds);
+
+        // Update URL
+        updateURLWithStop(stop.stop_code);
+
+        // Fly to stop location
+        if (map.current) {
+            map.current.flyTo({
+                center: [stop.stop_lon, stop.stop_lat],
+                zoom: 15,
+                duration: 1000
+            });
+        }
+
+        // Collapse Routes by Stops section
+        setIsRoutesByStopsExpanded(false);
+        setIsAllServicesExpanded(false);
+    };
+
+
 
     const filteredRoutes = useMemo(() => {
         const search = debouncedFilter.toLowerCase();
@@ -389,6 +516,16 @@ function App() {
                 a.route_short_name.localeCompare(b.route_short_name, undefined, { numeric: true, sensitivity: 'base' })
             );
     }, [routes, debouncedFilter]);
+
+    const filteredStops = useMemo(() => {
+        const search = debouncedStopSearch.trim().toUpperCase();
+        if (!search) return [];
+
+        // Case-insensitive matches on stop_code
+        return stops
+            .filter(s => s.stop_code.toUpperCase().includes(search))
+            .slice(0, 10); // Limit to 10 results for autocomplete
+    }, [stops, debouncedStopSearch]);
 
     const selectedRoutesList = useMemo(() => {
         return routes
@@ -467,6 +604,79 @@ function App() {
                 <div className="sidebar-header">
                     <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
                 </div>
+
+                {/* Section: Routes by Stops */}
+                <div
+                    className="section-header"
+                    onClick={() => setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded);
+                        }
+                    }}
+                    aria-expanded={isRoutesByStopsExpanded}
+                    aria-label={`${t.routesByStops} section`}
+                >
+                    <h3>{t.routesByStops}</h3>
+                    <span>{isRoutesByStopsExpanded ? '▲' : '▼'}</span>
+                </div>
+                {isRoutesByStopsExpanded && (
+                    <>
+                        <div className="search-container">
+                            <input
+                                type="text"
+                                className="search-input"
+                                placeholder={t.stopSearchPlaceholder}
+                                value={stopSearch}
+                                onChange={(e) => setStopSearch(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={t.stopSearchPlaceholder}
+                            />
+                        </div>
+                        {stopsLoading ? (
+                            <div className="loading-container">
+                                <div className="loading-spinner" />
+                                <span>{t.loading}</span>
+                            </div>
+                        ) : stopSearch.trim() && filteredStops.length > 0 ? (
+                            <ul className="route-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                {filteredStops.map(stop => (
+                                    <li
+                                        key={stop.stop_id}
+                                        className="route-item"
+                                        onClick={() => handleStopSelect(stop)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                handleStopSelect(stop);
+                                            }
+                                        }}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Stop ${stop.stop_code} - ${stop.stop_name}`}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="route-name">
+                                            <b>{stop.stop_code}</b>
+                                        </div>
+                                        <div className="route-desc" style={{ fontSize: '0.85rem' }}>
+                                            {stop.stop_name} ({stop.route_count} {t.routes})
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : stopSearch.trim() ? (
+                            <div className="empty-state">{t.noStopsFound}</div>
+                        ) : (
+                            <div className="empty-state" style={{ fontSize: '0.9rem', padding: '10px' }}>
+                                {t.stopSearchHint}
+                            </div>
+                        )}
+                    </>
+                )}
 
                 {/* Section: Selected Routes (Conditional on Selection Existence) */}
                 {selectedRoutesList.length > 0 && (
@@ -575,7 +785,7 @@ function App() {
                 {/* Toast Notification */}
                 {showToast && (
                     <div className="toast-notification">
-                        {t.noRoutesAtLocation}
+                        {toastMessage || t.noRoutesAtLocation}
                     </div>
                 )}
 

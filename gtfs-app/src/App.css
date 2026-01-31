@@ -528,6 +528,7 @@ button {
 .modal-text-column p {
   margin: 0 0 var(--space-lg) 0;
   line-height: 1.6;
+  font-size: 0.9375rem;
 }
 
 .modal-text-column p:last-child {
@@ -535,7 +536,7 @@ button {
 }
 
 .modal-text-column .instructions-narrative {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-style: italic;
   color: var(--text-main);
   margin: 0 0 var(--space-xl) 0;
