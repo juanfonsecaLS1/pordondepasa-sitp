@@ -126,19 +126,80 @@ function App() {
         localStorage.setItem('language', lang);
     }, [lang]);
 
-    // Map Style Update
-    useEffect(() => {
-        if (!map.current) return;
-        const styleUrl = MAP_STYLES[theme];
-        map.current.setStyle(styleUrl);
+    const updatePaintProperties = useCallback(() => {
+        if (!map.current || !map.current.getLayer('routes-layer')) return;
 
-        // Re-add route layers when style changes
-        map.current.once('style.load', () => {
-            addRouteLayers();
-        });
-    }, [theme]);
+        const selectedIds = Array.from(selectedRouteIdsRef.current);
+        const hasSelection = selectedIds.length > 0;
+        const hasHover = isHoveringRef.current;
+        const hasMarker = isMarkerActiveRef.current;
+        const sidebarHoverId = sidebarHoveredIdRef.current;
+        const isFocused = hasMarker || hasSelection || hasHover;
 
-    const addRouteLayers = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let opacityExpression: any;
+        if (sidebarHoverId) {
+            opacityExpression = [
+                'case',
+                ['==', ['get', 'route_id'], sidebarHoverId], 1.0,
+                ['in', ['get', 'route_id'], ['literal', selectedIds]], 0.1,
+                0.0
+            ];
+        } else {
+            opacityExpression = [
+                'case',
+                ['boolean', ['feature-state', 'hover'], false], 0.7,
+                ['in', ['get', 'route_id'], ['literal', selectedIds]], 0.7,
+                isFocused ? 0.0 : 0.3
+            ];
+        }
+        map.current.setPaintProperty('routes-layer', 'line-opacity', opacityExpression);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const widthExpression: any = [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 4,
+            ['in', ['get', 'route_id'], ['literal', selectedIds]], 4,
+            2
+        ];
+        map.current.setPaintProperty('routes-layer', 'line-width', widthExpression);
+
+        if (hasSelection) {
+            const selectedMeta = routesRef.current.filter(r => selectedRouteIdsRef.current.has(r.route_id));
+            // Sort to match the order used in sidebar and legend
+            const sortedUniqueShortNames = Array.from(
+                new Set(
+                    selectedMeta
+                        .map(r => r.route_short_name)
+                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+                )
+            );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const matchExpression: any = ['match', ['get', 'route_id']];
+
+            selectedMeta.forEach(route => {
+                const colorIndex = sortedUniqueShortNames.indexOf(route.route_short_name);
+                const color = SELECTION_COLORS[colorIndex % SELECTION_COLORS.length];
+                matchExpression.push(route.route_id);
+                matchExpression.push(color);
+            });
+            matchExpression.push('#1e90ff');
+            map.current.setPaintProperty('routes-layer', 'line-color', matchExpression);
+        } else {
+            map.current.setPaintProperty('routes-layer', 'line-color', '#1e90ff');
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sortExpression: any = [
+            'case',
+            ['==', ['get', 'route_id'], sidebarHoverId || ''], 1000,
+            ['in', ['get', 'route_id'], ['literal', selectedIds]], 500,
+            0
+        ];
+        map.current.setLayoutProperty('routes-layer', 'line-sort-key', sortExpression);
+    }, []);
+
+    const addRouteLayers = useCallback(() => {
         if (!map.current) return;
         if (map.current.getSource('all-routes')) return;
 
@@ -164,76 +225,19 @@ function App() {
         });
 
         updatePaintProperties();
-    };
+    }, [updatePaintProperties]);
 
-    const updatePaintProperties = useCallback(() => {
-        if (!map.current || !map.current.getLayer('routes-layer')) return;
+    // Map Style Update
+    useEffect(() => {
+        if (!map.current) return;
+        const styleUrl = MAP_STYLES[theme];
+        map.current.setStyle(styleUrl);
 
-        const selectedIds = Array.from(selectedRouteIdsRef.current);
-        const hasSelection = selectedIds.length > 0;
-        const hasHover = isHoveringRef.current;
-        const hasMarker = isMarkerActiveRef.current;
-        const sidebarHoverId = sidebarHoveredIdRef.current;
-        const isFocused = hasMarker || hasSelection || hasHover;
-
-        let opacityExpression: any;
-        if (sidebarHoverId) {
-            opacityExpression = [
-                'case',
-                ['==', ['get', 'route_id'], sidebarHoverId], 1.0,
-                ['in', ['get', 'route_id'], ['literal', selectedIds]], 0.1,
-                0.0
-            ];
-        } else {
-            opacityExpression = [
-                'case',
-                ['boolean', ['feature-state', 'hover'], false], 0.7,
-                ['in', ['get', 'route_id'], ['literal', selectedIds]], 0.7,
-                isFocused ? 0.0 : 0.3
-            ];
-        }
-        map.current.setPaintProperty('routes-layer', 'line-opacity', opacityExpression);
-
-        const widthExpression: any = [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false], 4,
-            ['in', ['get', 'route_id'], ['literal', selectedIds]], 4,
-            2
-        ];
-        map.current.setPaintProperty('routes-layer', 'line-width', widthExpression);
-
-        if (hasSelection) {
-            const selectedMeta = routesRef.current.filter(r => selectedRouteIdsRef.current.has(r.route_id));
-            // Sort to match the order used in sidebar and legend
-            const sortedUniqueShortNames = Array.from(
-                new Set(
-                    selectedMeta
-                        .map(r => r.route_short_name)
-                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
-                )
-            );
-            const matchExpression: any = ['match', ['get', 'route_id']];
-
-            selectedMeta.forEach(route => {
-                const colorIndex = sortedUniqueShortNames.indexOf(route.route_short_name);
-                const color = SELECTION_COLORS[colorIndex % SELECTION_COLORS.length];
-                matchExpression.push(route.route_id);
-                matchExpression.push(color);
-            });
-            matchExpression.push('#1e90ff');
-            map.current.setPaintProperty('routes-layer', 'line-color', matchExpression);
-        } else {
-            map.current.setPaintProperty('routes-layer', 'line-color', '#1e90ff');
-        }
-
-        const sortExpression: any = [
-            'case',
-            ['==', ['get', 'route_id'], sidebarHoverId || ''], 1000,
-            ['in', ['get', 'route_id'], ['literal', selectedIds]], 500,
-            0
-        ];
-        map.current.setLayoutProperty('routes-layer', 'line-sort-key', sortExpression);
-    }, []);
+        // Re-add route layers when style changes
+        map.current.once('style.load', () => {
+            addRouteLayers();
+        });
+    }, [theme, addRouteLayers]);
 
     useEffect(() => {
         selectedRouteIdsRef.current = selectedRouteIds;
@@ -484,6 +488,7 @@ function App() {
                 .then(data => {
                     if (map.current && data.features.length > 0) {
                         const bounds = new maplibregl.LngLatBounds();
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         data.features.forEach((feature: any) => {
                             if (feature.geometry.type === 'LineString') {
                                 feature.geometry.coordinates.forEach((coord: [number, number]) => { bounds.extend(coord); });
@@ -873,8 +878,6 @@ function App() {
                                 return null;
                             }
 
-                            const maxBusesPerHour = Math.max(...freq.hourly_profile.map(h => h.buses_per_hour), 1);
-
                             // Prepare data for Chart.js
                             const chartData = {
                                 labels: freq.hourly_profile.map(h => h.hour.toString()),
@@ -897,6 +900,7 @@ function App() {
                                     },
                                     tooltip: {
                                         callbacks: {
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             label: (context: any) => {
                                                 return `${context.parsed.y.toFixed(1)} buses/hr`;
                                             }
@@ -909,7 +913,7 @@ function App() {
                                             display: false
                                         },
                                         ticks: {
-                                            callback: function (value: any, index: number) {
+                                            callback: function (_value: unknown, index: number) {
                                                 const hour = freq.hourly_profile[index]?.hour;
                                                 return hour && hour % 4 === 0 ? hour : '';
                                             },
@@ -931,7 +935,7 @@ function App() {
                                             },
                                             maxTicksLimit: 6
                                         },
-                                        afterFit: (scaleInstance: any) => {
+                                        afterFit: (scaleInstance: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
                                             scaleInstance.width = 35;
                                         }
                                     }
