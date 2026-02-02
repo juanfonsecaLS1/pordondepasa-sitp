@@ -50,3 +50,13 @@ rsconnect/
 
 # ZIP files
 *.zip
+
+# Backup files
+*.backup
+*~
+
+# Node modules
+node_modules/
+
+# Build output
+dist/
