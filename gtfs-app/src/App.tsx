@@ -913,7 +913,8 @@ function App() {
                                             display: false
                                         },
                                         ticks: {
-                                            callback: function (_value: unknown, index: number) {
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                            callback: function (_value: any, index: number) {
                                                 const hour = freq.hourly_profile[index]?.hour;
                                                 return hour && hour % 4 === 0 ? hour : '';
                                             },
