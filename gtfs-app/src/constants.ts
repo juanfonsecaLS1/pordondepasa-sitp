@@ -57,7 +57,12 @@ export const TRANSLATIONS = {
         githubIssues: "Reportar un problema: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Cerrar",
         noRoutesAtLocation: "No se encontraron rutas en esta ubicación",
-        smallScreenWarning: "Para una mejor experiencia, se recomienda usar una pantalla más grande"
+        smallScreenWarning: "Para una mejor experiencia, se recomienda usar una pantalla más grande",
+        // Frequency panel
+        avgFrequency: "Frecuencia promedio",
+        dailyTrips: "Viajes diarios",
+        busesPerHour: "Buses por hora",
+        frequencyNote: "Frecuencias programadas extraídas del GTFS"
     },
     en: {
         title: "Where does it go?",
@@ -94,7 +99,12 @@ export const TRANSLATIONS = {
         githubIssues: "Report an issue: [Issues](https://github.com/juanfonsecaLS1/pordondepasa-sitp/issues)",
         closeButton: "Close",
         noRoutesAtLocation: "No routes found at this location",
-        smallScreenWarning: "For a better experience, please use a larger screen"
+        smallScreenWarning: "For a better experience, please use a larger screen",
+        // Frequency panel
+        avgFrequency: "Avg Frequency",
+        dailyTrips: "Daily Trips",
+        busesPerHour: "Buses per Hour",
+        frequencyNote: "Planned frequencies extracted from GTFS"
     }
 } as const;
 

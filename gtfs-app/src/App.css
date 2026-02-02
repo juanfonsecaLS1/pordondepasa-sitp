@@ -834,3 +834,120 @@ button:focus:not(:focus-visible) {
     }
   }
 }
+
+/* Frequency Panel */
+.frequency-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 320px;
+  background: rgba(250, 250, 250, 0.70);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease-out;
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .frequency-panel {
+  background: rgba(23, 23, 23, 0.70);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.frequency-panel-header {
+  margin-bottom: var(--space-lg);
+}
+
+.frequency-panel-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.frequency-panel-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.frequency-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.frequency-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.frequency-stat-label {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.frequency-stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.frequency-stat-unit {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.frequency-chart {
+  margin-top: var(--space-md);
+}
+
+.frequency-chart-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 var(--space-md) 0;
+}
+
+.frequency-chart-canvas {
+  height: 120px;
+  width: 100%;
+}
+
+.frequency-note {
+  margin-top: var(--space-sm);
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .frequency-panel {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+}
