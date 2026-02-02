@@ -5,6 +5,10 @@ import './App.css';
 import { sanitizeRouteId } from './utils';
 import { useDebounce } from './hooks';
 import { parseStopFromURL, updateURLWithStop, clearStopFromURL } from './urlUtils';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 import {
     BOGOTA_BOUNDS,
     BOGOTA_CENTER,
@@ -37,13 +41,37 @@ interface Stop {
     route_count: number;
 }
 
+interface HourlyFrequency {
+    hour: number;
+    trips: number;
+    avg_headway_minutes: number;
+    buses_per_hour: number;
+}
+
+interface RouteFrequency {
+    route_id: string;
+    route_short_name: string;
+    route_long_name: string;
+    route_color: string;
+    route_text_color: string;
+    num_trips: number;
+    first_departure: string;
+    last_departure: string;
+    avg_headway_minutes: number;
+    min_headway_minutes: number;
+    max_headway_minutes: number;
+    hourly_profile: HourlyFrequency[];
+}
+
 function App() {
     const [routes, setRoutes] = useState<RouteMeta[]>([]);
     const [stops, setStops] = useState<Stop[]>([]);
+    const [frequencies, setFrequencies] = useState<Record<string, RouteFrequency>>({});
     const [filter, setFilter] = useState('');
     const [stopSearch, setStopSearch] = useState('');
     const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(new Set());
     const [, setSelectedStop] = useState<Stop | null>(null);
+    const [hoveredFrequencyRoute, setHoveredFrequencyRoute] = useState<string | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
     const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(true);
@@ -201,7 +229,6 @@ function App() {
         const sortExpression: any = [
             'case',
             ['==', ['get', 'route_id'], sidebarHoverId || ''], 1000,
-            ['boolean', ['feature-state', 'hover'], false], 900,
             ['in', ['get', 'route_id'], ['literal', selectedIds]], 500,
             0
         ];
@@ -431,6 +458,21 @@ function App() {
             });
     }, []);
 
+    // Load frequency data
+    useEffect(() => {
+        fetch(`${import.meta.env.BASE_URL}routes_data/route_frequencies.json`)
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch frequencies');
+                return res.json();
+            })
+            .then(data => {
+                setFrequencies(data);
+            })
+            .catch(err => {
+                console.error("Failed to load frequencies", err);
+            });
+    }, []);
+
     // Zoom logic
     useEffect(() => {
         if (!map.current || markerLocation) return;
@@ -458,12 +500,15 @@ function App() {
         setSidebarHoveredId(null);
         setSelectedStop(null);
         clearStopFromURL();
+
         // Logic for Sidebar Selection:
         // Always collapse "All Services" to focus on "Selected Routes" section which will appear
         setIsAllServicesExpanded(false);
 
         if (selectedRouteIds.has(routeId) && selectedRouteIds.size === 1) {
             setSelectedRouteIds(new Set());
+            // Clear frequency panel when deselecting the last route
+            setHoveredFrequencyRoute(null);
         } else {
             setSelectedRouteIds(new Set([routeId]));
         }
@@ -475,6 +520,7 @@ function App() {
         setSelectedRouteIds(new Set());
         setSelectedStop(null);
         clearStopFromURL();
+        setHoveredFrequencyRoute(null);
     };
 
     const handleStopSelect = (stop: Stop) => {
@@ -558,8 +604,17 @@ function App() {
                 key={route.route_id}
                 className={`route-item ${isSelected ? 'selected' : ''} ${isCompact ? 'compact' : ''}`}
                 onClick={() => handleSidebarSelect(route.route_id)}
-                onMouseEnter={() => setSidebarHoveredId(route.route_id)}
-                onMouseLeave={() => setSidebarHoveredId(null)}
+                onMouseEnter={() => {
+                    setSidebarHoveredId(route.route_id);
+                    // Show frequency panel only if route is selected
+                    if (isSelected) {
+                        setHoveredFrequencyRoute(route.route_id);
+                    }
+                }}
+                onMouseLeave={() => {
+                    setSidebarHoveredId(null);
+                    setHoveredFrequencyRoute(null);
+                }}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -804,6 +859,125 @@ function App() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* Frequency Panel */}
+                {hoveredFrequencyRoute && frequencies[hoveredFrequencyRoute] && (
+                    <div className="frequency-panel">
+                        {(() => {
+                            const freq = frequencies[hoveredFrequencyRoute];
+
+                            // Check if route has valid frequency data
+                            if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
+                                return null;
+                            }
+
+                            const maxBusesPerHour = Math.max(...freq.hourly_profile.map(h => h.buses_per_hour), 1);
+
+                            // Prepare data for Chart.js
+                            const chartData = {
+                                labels: freq.hourly_profile.map(h => h.hour.toString()),
+                                datasets: [
+                                    {
+                                        data: freq.hourly_profile.map(h => h.buses_per_hour),
+                                        backgroundColor: 'rgba(0, 191, 255, 0.7)', // deepskyblue2
+                                        borderWidth: 0,
+                                        borderRadius: 2,
+                                    }
+                                ]
+                            };
+
+                            const chartOptions = {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context: any) => {
+                                                return `${context.parsed.y.toFixed(1)} buses/hr`;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: {
+                                            display: false
+                                        },
+                                        ticks: {
+                                            callback: function (value: any, index: number) {
+                                                const hour = freq.hourly_profile[index]?.hour;
+                                                return hour && hour % 4 === 0 ? hour : '';
+                                            },
+                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                                            font: {
+                                                size: 11
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: {
+                                            color: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                                        },
+                                        ticks: {
+                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                                            font: {
+                                                size: 11
+                                            },
+                                            maxTicksLimit: 6
+                                        },
+                                        afterFit: (scaleInstance: any) => {
+                                            scaleInstance.width = 35;
+                                        }
+                                    }
+                                }
+                            };
+
+                            return (
+                                <>
+                                    <div className="frequency-panel-header">
+                                        <div className="frequency-panel-title">
+                                            {freq.route_short_name} - {freq.route_long_name}
+                                        </div>
+                                        <div className="frequency-panel-subtitle">
+                                            {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
+                                        </div>
+                                    </div>
+
+                                    <div className="frequency-stats">
+                                        <div className="frequency-stat">
+                                            <div className="frequency-stat-label">{t.avgFrequency}</div>
+                                            <div className="frequency-stat-value">
+                                                {freq.avg_headway_minutes.toFixed(1)}
+                                                <span className="frequency-stat-unit"> min</span>
+                                            </div>
+                                        </div>
+                                        <div className="frequency-stat">
+                                            <div className="frequency-stat-label">{t.dailyTrips}</div>
+                                            <div className="frequency-stat-value">
+                                                {freq.num_trips}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="frequency-chart">
+                                        <div className="frequency-chart-title">{t.busesPerHour}</div>
+                                        <div className="frequency-chart-canvas">
+                                            <Bar data={chartData} options={chartOptions} />
+                                        </div>
+                                    </div>
+
+                                    <div className="frequency-note">
+                                        <span className="frequency-note-italic">{t.frequencyNote}</span>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
             </div>

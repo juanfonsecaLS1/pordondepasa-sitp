@@ -101,6 +101,22 @@ def calculate_route_headways(route_id, route_trips, all_stop_times):
                     'avg_headway_minutes': round(avg_headway, 1),
                     'buses_per_hour': buses_per_hour
                 })
+            else:
+                # Hour has trips but no valid headways (single trip or all zero headways)
+                hourly_profile.append({
+                    'hour': hour,
+                    'trips': len(hour_trips),
+                    'avg_headway_minutes': 0,
+                    'buses_per_hour': 0
+                })
+        else:
+            # No trips or only one trip in this hour - add zero data
+            hourly_profile.append({
+                'hour': hour,
+                'trips': len(hour_trips),
+                'avg_headway_minutes': 0,
+                'buses_per_hour': 0
+            })
     
     stats['hourly_profile'] = hourly_profile
     
