@@ -74,9 +74,11 @@ function App() {
     const [hoveredFrequencyRoute, setHoveredFrequencyRoute] = useState<string | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
-    const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(true);
+    const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(false);
     const [markerLocation, setMarkerLocation] = useState<{ lng: number, lat: number } | null>(null);
     const [sidebarHoveredId, setSidebarHoveredId] = useState<string | null>(null);
+
+    const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
 
     const [theme, setTheme] = useState<Theme>(() => {
         const saved = localStorage.getItem('theme');
@@ -125,6 +127,15 @@ function App() {
     useEffect(() => {
         localStorage.setItem('language', lang);
     }, [lang]);
+
+    const resetMapHover = useCallback(() => {
+        if (!map.current) return;
+        hoveredStateIds.current.forEach(id => {
+            map.current?.setFeatureState({ source: 'all-routes', id: id }, { hover: false });
+        });
+        hoveredStateIds.current.clear();
+        isHoveringRef.current = false;
+    }, []);
 
     const updatePaintProperties = useCallback(() => {
         if (!map.current || !map.current.getLayer('routes-layer')) return;
@@ -374,6 +385,11 @@ function App() {
             });
             setSelectedRouteIds(newSelection);
 
+            // Open mobile panel if route selected
+            if (newSelection.size > 0 && window.innerWidth <= 768) {
+                setIsMobilePanelOpen(true);
+            }
+
             // Show toast if no routes found
             if (newSelection.size === 0) {
                 setToastMessage(t.noRoutesAtLocation);
@@ -501,6 +517,7 @@ function App() {
     }, [selectedRouteIds, markerLocation]);
 
     const handleSidebarSelect = (routeId: string) => {
+        resetMapHover();
         setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedStop(null);
@@ -520,6 +537,7 @@ function App() {
     };
 
     const clearSelection = () => {
+        resetMapHover();
         setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedRouteIds(new Set());
@@ -529,6 +547,7 @@ function App() {
     };
 
     const handleStopSelect = (stop: Stop) => {
+        resetMapHover();
         setSelectedStop(stop);
         setMarkerLocation({ lng: stop.stop_lon, lat: stop.stop_lat });
 
@@ -590,6 +609,9 @@ function App() {
     const uniqueSelectedShortNames = useMemo(() => {
         return Array.from(new Set(selectedRoutesList.map(r => r.route_short_name)));
     }, [selectedRoutesList]);
+
+    // Determine which route to show frequency for: Hover takes precedence, then single selection
+    const activeFrequencyRouteId = hoveredFrequencyRoute || (selectedRouteIds.size === 1 ? Array.from(selectedRouteIds)[0] : null);
 
     const renderRouteItem = (route: RouteMeta, isCompact: boolean, showDot: boolean = true) => {
         const isSelected = selectedRouteIds.has(route.route_id);
@@ -653,28 +675,82 @@ function App() {
         );
     };
 
+    const toggleMobilePanel = useCallback(() => {
+        setIsMobilePanelOpen((prev) => {
+            const next = !prev;
+            if (!next) {
+                setIsRoutesByStopsExpanded(false);
+                setIsAllServicesExpanded(false);
+            }
+            return next;
+        });
+    }, []);
+
     return (
         <div className="app-container">
-            {/* Small Screen Warning */}
-            <div className="small-screen-warning">
-                <p>{t.smallScreenWarning}</p>
-            </div>
+            <img
+                src={`${import.meta.env.BASE_URL}PDP_logo_mobile.png`}
+                alt="¿Por Dónde Pasa?"
+                className="mobile-logo"
+            />
 
-            <div className="sidebar">
+            <div className={`sidebar ${isMobilePanelOpen ? 'mobile-open' : ''}`}>
+                <div
+                    className="mobile-drag-handle"
+                    onClick={toggleMobilePanel}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        toggleMobilePanel();
+                    }}
+                    role="button"
+                    aria-label="Toggle menu"
+                >
+                    <div className="handle-bar" />
+                </div>
+
                 <div className="sidebar-header">
                     <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
                 </div>
 
+                {/* Section: Selected Routes (Conditional on Selection Existence) */}
+                {selectedRoutesList.length > 0 && (
+                    <>
+                        <div className="section-header" style={{ cursor: 'default', background: '#f0f7ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ color: '#333' }}>{t.selectedRoutes} ({selectedRoutesList.length})</h3>
+                            <button
+                                className="clear-button-inline"
+                                onClick={clearSelection}
+                                aria-label={t.clearSelection}
+                            >
+                                {t.clearSelection}
+                            </button>
+                        </div>
+                        <ul className="route-list" style={{ flex: 1, overflowY: 'auto' }}>
+                            {selectedRoutesList.map((r) => renderRouteItem(r, true, true))}
+                        </ul>
+                    </>
+                )}
+
                 {/* Section: Routes by Stops */}
                 <div
                     className="section-header"
-                    onClick={() => setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded)}
+                    onClick={() => {
+                        const next = !isRoutesByStopsExpanded;
+                        setIsRoutesByStopsExpanded(next);
+                        if (next) {
+                            setIsMobilePanelOpen(true);
+                        }
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded);
+                            const next = !isRoutesByStopsExpanded;
+                            setIsRoutesByStopsExpanded(next);
+                            if (next) {
+                                setIsMobilePanelOpen(true);
+                            }
                         }
                     }}
                     aria-expanded={isRoutesByStopsExpanded}
@@ -738,35 +814,26 @@ function App() {
                     </>
                 )}
 
-                {/* Section: Selected Routes (Conditional on Selection Existence) */}
-                {selectedRoutesList.length > 0 && (
-                    <>
-                        <div className="section-header" style={{ cursor: 'default', background: '#f0f7ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ color: '#333' }}>{t.selectedRoutes} ({selectedRoutesList.length})</h3>
-                            <button
-                                className="clear-button-inline"
-                                onClick={clearSelection}
-                                aria-label={t.clearSelection}
-                            >
-                                {t.clearSelection}
-                            </button>
-                        </div>
-                        <ul className="route-list" style={{ flex: 1, overflowY: 'auto' }}>
-                            {selectedRoutesList.map((r) => renderRouteItem(r, true, true))}
-                        </ul>
-                    </>
-                )}
-
                 {/* Section: All Services */}
                 <div
                     className="section-header"
-                    onClick={() => setIsAllServicesExpanded(!isAllServicesExpanded)}
+                    onClick={() => {
+                        const next = !isAllServicesExpanded;
+                        setIsAllServicesExpanded(next);
+                        if (next) {
+                            setIsMobilePanelOpen(true);
+                        }
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            setIsAllServicesExpanded(!isAllServicesExpanded);
+                            const next = !isAllServicesExpanded;
+                            setIsAllServicesExpanded(next);
+                            if (next) {
+                                setIsMobilePanelOpen(true);
+                            }
                         }
                     }}
                     aria-expanded={isAllServicesExpanded}
@@ -822,19 +889,26 @@ function App() {
             <div className="map-wrapper" style={{ position: 'relative', flex: 1 }}>
                 <div className="map-container" ref={mapContainer} />
 
+                {/* Mobile About Button (Below Logo) */}
+                <button
+                    className="floating-about-btn mobile-left-position"
+                    onClick={() => setShowAbout(true)}
+                    aria-label={t.aboutButton}
+                >
+                    ?
+                </button>
+
                 {/* Controls Container */}
-                <div style={{ position: 'absolute', top: '20px', right: '60px', zIndex: 1000, display: 'flex', gap: '10px' }}>
+                <div className="map-controls-group">
                     <button
                         className="theme-button"
-                        style={{ position: 'static' }}
                         onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
                         aria-label={`Switch to ${lang === 'es' ? 'English' : 'Spanish'}`}
                     >
-                        {t.langLabel}
+                        {lang === 'es' ? 'EN' : 'ES'}
                     </button>
                     <button
                         className="theme-button"
-                        style={{ position: 'static' }}
                         onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                         aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
                     >
@@ -868,10 +942,10 @@ function App() {
                 )}
 
                 {/* Frequency Panel */}
-                {hoveredFrequencyRoute && frequencies[hoveredFrequencyRoute] && (
+                {activeFrequencyRouteId && frequencies[activeFrequencyRouteId] && (
                     <div className="frequency-panel">
                         {(() => {
-                            const freq = frequencies[hoveredFrequencyRoute];
+                            const freq = frequencies[activeFrequencyRouteId];
 
                             // Check if route has valid frequency data
                             if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
@@ -946,11 +1020,30 @@ function App() {
                             return (
                                 <>
                                     <div className="frequency-panel-header">
-                                        <div className="frequency-panel-title">
-                                            {freq.route_short_name} - {freq.route_long_name}
-                                        </div>
-                                        <div className="frequency-panel-subtitle">
-                                            {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                            <div>
+                                                <div className="frequency-panel-title">
+                                                    {freq.route_short_name} - {freq.route_long_name}
+                                                </div>
+                                                <div className="frequency-panel-subtitle">
+                                                    {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
+                                                </div>
+                                            </div>
+                                            <button
+                                                className="frequency-close-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setHoveredFrequencyRoute(null);
+                                                    if (selectedRouteIds.size === 1) {
+                                                        setSelectedRouteIds(new Set());
+                                                        setMarkerLocation(null);
+                                                        clearStopFromURL();
+                                                    }
+                                                }}
+                                                aria-label="Close details"
+                                            >
+                                                ×
+                                            </button>
                                         </div>
                                     </div>
 

@@ -71,33 +71,20 @@ html,
   width: 100vw;
 }
 
-/* Small Screen Warning */
-.small-screen-warning {
+/* Mobile Logo */
+.mobile-logo {
   display: none;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 40px;
+  height: auto;
+  z-index: 1000;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-@media (max-width: 768px) {
-  .small-screen-warning {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-color);
-    z-index: 10000;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-2xl);
-    text-align: center;
-  }
-
-  .small-screen-warning p {
-    font-size: 1.125rem;
-    color: var(--text-main);
-    line-height: 1.6;
-    max-width: 400px;
-  }
+[data-theme='dark'] .mobile-logo {
+  filter: invert(1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 /* Sidebar */
@@ -110,6 +97,7 @@ html,
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-color);
+  transition: height 0.3s ease;
 }
 
 .sidebar-header {
@@ -273,6 +261,8 @@ html,
   transition: background 0.15s ease;
   background: transparent;
   color: var(--text-main);
+  min-height: 44px;
+  /* Accessible touch target */
 }
 
 .route-item.compact {
@@ -379,13 +369,11 @@ button {
   font-family: var(--font-family);
   cursor: pointer;
   transition: opacity 0.15s ease, background 0.15s ease;
+  min-height: 44px;
+  /* Accessible touch target */
 }
 
 .theme-button {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 1000;
   background: var(--sidebar-bg);
   color: var(--text-main);
   border: 1px solid var(--border-color);
@@ -393,6 +381,7 @@ button {
   border-radius: 6px;
   font-size: 0.8125rem;
   font-weight: 600;
+  min-height: auto;
 }
 
 .theme-button:hover {
@@ -408,6 +397,7 @@ button {
   font-weight: 600;
   font-size: 0.75rem;
   white-space: nowrap;
+  min-height: auto;
 }
 
 .clear-button-inline:hover {
@@ -711,39 +701,243 @@ button {
   font-size: 0.875rem;
 }
 
+/* Mobile Drag Handle */
+.mobile-drag-handle {
+  display: none;
+  width: 100%;
+  height: 32px;
+  /* Increased touch target */
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--border-color);
+  /* Separator */
+}
+
+.handle-bar {
+  width: 40px;
+  height: 4px;
+  background-color: var(--border-color);
+  border-radius: 2px;
+}
+
+.frequency-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0 var(--space-xs);
+  cursor: pointer;
+  min-height: auto;
+}
+
+/* Map Controls Group */
+.map-controls-group {
+  position: absolute;
+  top: 16px;
+  right: 64px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.theme-button {
+  background: var(--sidebar-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  min-height: auto;
+  width: auto;
+  height: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+/* Floating About Button (Base Style) */
+.floating-about-btn {
+  display: none;
+  /* Hidden on desktop */
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 6px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 1000;
+  transition: background 0.15s ease;
+}
+
+.floating-about-btn:hover {
+  background: var(--hover-bg);
+}
+
+.theme-button:hover {
+  opacity: 0.7;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
-  .sidebar {
-    width: 100%;
-    max-height: 50vh;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-  }
-
   .app-container {
     flex-direction: column;
+  }
+
+  /* Compact Sidebar Items */
+  .section-header {
+    padding: 0 var(--space-md);
+    height: 44px;
+  }
+
+  .route-item {
+    padding: var(--space-sm) var(--space-md);
+    min-height: 48px;
+  }
+
+  .search-container {
+    padding: var(--space-md);
+  }
+
+  /* Hide Desktop Sidebar Header & Footer */
+  .sidebar-header,
+  .sidebar-footer {
+    display: none;
+  }
+
+  /* Restore Horizontal Map Controls for Mobile to match start/desktop style */
+  .map-controls-group {
+    top: 84px;
+    left: 12px;
+    right: auto;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .theme-button {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    font-size: 0.8125rem;
+    background: var(--bg-color);
+  }
+
+  /* Mobile About Button Position */
+  .floating-about-btn.mobile-left-position {
+    display: flex;
+    position: absolute;
+    top: 168px;
+    /* Below the mobile logo and language/theme buttons */
+    left: 12px;
+    width: 36px;
+    height: 36px;
+    background: var(--bg-color);
+  }
+
+  .mobile-logo {
+    display: block;
+  }
+
+  .mobile-drag-handle {
+    display: flex;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: 76px;
+    /* Collapsed state */
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    top: auto;
+    z-index: 1000;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 12px 12px 0 0;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+
+  .sidebar.mobile-open {
+    height: 60vh;
+    /* Expanded state */
+    overflow-y: auto;
+  }
+
+  .sidebar.mobile-open .mobile-drag-handle {
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
   .map-wrapper {
     height: 100vh;
   }
 
-  .theme-button {
-    right: 12px;
-    top: 12px;
-    font-size: 0.75rem;
-    padding: var(--space-xs) var(--space-md);
+  .map-legend {
+    display: none;
   }
 
-  .map-legend {
-    right: 12px;
-    bottom: 16px;
-    font-size: 0.75rem;
-    padding: var(--space-md);
+  .sidebar.mobile-open~.map-wrapper .map-legend {
+    bottom: calc(60vh + 20px);
+  }
+
+  /* Adjust Frequency Panel for Mobile */
+  .frequency-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    max-width: none;
+    border-radius: 12px 12px 0 0;
+    background: var(--sidebar-bg);
+    padding: var(--space-lg) var(--space-lg) var(--space-2xl) var(--space-lg);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: none;
+    z-index: 1100;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* Compact Frequency Stats for Mobile */
+  .frequency-stats {
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    gap: var(--space-lg);
+  }
+
+  .frequency-stat-value {
+    font-size: 1.125rem;
+  }
+
+  .frequency-chart-canvas {
+    height: 80px;
   }
 
   .modal-content {
@@ -815,7 +1009,8 @@ button:focus:not(:focus-visible) {
 
 @media (max-width: 768px) {
   .toast-notification {
-    top: 16px;
+    top: 60px;
+    /* Avoid logo overlap */
     left: 16px;
     right: 16px;
     transform: none;
