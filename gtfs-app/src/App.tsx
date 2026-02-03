@@ -72,11 +72,14 @@ function App() {
     const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(new Set());
     const [, setSelectedStop] = useState<Stop | null>(null);
     const [hoveredFrequencyRoute, setHoveredFrequencyRoute] = useState<string | null>(null);
+    const [dismissedFrequencyRouteId, setDismissedFrequencyRouteId] = useState<string | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
-    const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(true);
+    const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(false);
     const [markerLocation, setMarkerLocation] = useState<{ lng: number, lat: number } | null>(null);
     const [sidebarHoveredId, setSidebarHoveredId] = useState<string | null>(null);
+
+    const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
 
     const [theme, setTheme] = useState<Theme>(() => {
         const saved = localStorage.getItem('theme');
@@ -125,6 +128,15 @@ function App() {
     useEffect(() => {
         localStorage.setItem('language', lang);
     }, [lang]);
+
+    const resetMapHover = useCallback(() => {
+        if (!map.current) return;
+        hoveredStateIds.current.forEach(id => {
+            map.current?.setFeatureState({ source: 'all-routes', id: id }, { hover: false });
+        });
+        hoveredStateIds.current.clear();
+        isHoveringRef.current = false;
+    }, []);
 
     const updatePaintProperties = useCallback(() => {
         if (!map.current || !map.current.getLayer('routes-layer')) return;
@@ -374,6 +386,11 @@ function App() {
             });
             setSelectedRouteIds(newSelection);
 
+            // Open mobile panel if route selected
+            if (newSelection.size > 0 && window.innerWidth <= 768) {
+                setIsMobilePanelOpen(true);
+            }
+
             // Show toast if no routes found
             if (newSelection.size === 0) {
                 setToastMessage(t.noRoutesAtLocation);
@@ -501,7 +518,7 @@ function App() {
     }, [selectedRouteIds, markerLocation]);
 
     const handleSidebarSelect = (routeId: string) => {
-        setMarkerLocation(null);
+        resetMapHover();
         setSidebarHoveredId(null);
         setSelectedStop(null);
         clearStopFromURL();
@@ -520,6 +537,7 @@ function App() {
     };
 
     const clearSelection = () => {
+        resetMapHover();
         setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedRouteIds(new Set());
@@ -529,6 +547,7 @@ function App() {
     };
 
     const handleStopSelect = (stop: Stop) => {
+        resetMapHover();
         setSelectedStop(stop);
         setMarkerLocation({ lng: stop.stop_lon, lat: stop.stop_lat });
 
@@ -590,6 +609,21 @@ function App() {
     const uniqueSelectedShortNames = useMemo(() => {
         return Array.from(new Set(selectedRoutesList.map(r => r.route_short_name)));
     }, [selectedRoutesList]);
+
+    // Determine which route to show frequency for: Hover takes precedence, then single selection
+    const activeFrequencyRouteId = hoveredFrequencyRoute || (selectedRouteIds.size === 1 ? Array.from(selectedRouteIds)[0] : null);
+    const isFrequencyPanelVisible = !!activeFrequencyRouteId && activeFrequencyRouteId !== dismissedFrequencyRouteId;
+
+    useEffect(() => {
+        if (!activeFrequencyRouteId) {
+            setDismissedFrequencyRouteId(null);
+            return;
+        }
+
+        if (dismissedFrequencyRouteId && activeFrequencyRouteId !== dismissedFrequencyRouteId) {
+            setDismissedFrequencyRouteId(null);
+        }
+    }, [activeFrequencyRouteId, dismissedFrequencyRouteId]);
 
     const renderRouteItem = (route: RouteMeta, isCompact: boolean, showDot: boolean = true) => {
         const isSelected = selectedRouteIds.has(route.route_id);
@@ -653,28 +687,227 @@ function App() {
         );
     };
 
+    const toggleMobilePanel = useCallback(() => {
+        setIsMobilePanelOpen((prev) => {
+            const next = !prev;
+            if (!next) {
+                setIsRoutesByStopsExpanded(false);
+                setIsAllServicesExpanded(false);
+            }
+            return next;
+        });
+    }, []);
+
+    const frequencyPanelContent = isFrequencyPanelVisible && activeFrequencyRouteId && frequencies[activeFrequencyRouteId]
+        ? (() => {
+            const freq = frequencies[activeFrequencyRouteId];
+
+            // Check if route has valid frequency data
+            if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
+                return null;
+            }
+
+            // Prepare data for Chart.js
+            const chartData = {
+                labels: freq.hourly_profile.map(h => h.hour.toString()),
+                datasets: [
+                    {
+                        data: freq.hourly_profile.map(h => h.buses_per_hour),
+                        backgroundColor: 'rgba(0, 191, 255, 0.7)', // deepskyblue2
+                        borderWidth: 0,
+                        borderRadius: 2,
+                    }
+                ]
+            };
+
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            label: (context: any) => {
+                                return `${context.parsed.y.toFixed(1)} buses/hr`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            callback: function (_value: any, index: number) {
+                                const hour = freq.hourly_profile[index]?.hour;
+                                return hour && hour % 4 === 0 ? hour : '';
+                            },
+                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                        },
+                        ticks: {
+                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                            font: {
+                                size: 11
+                            },
+                            maxTicksLimit: 6
+                        },
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        afterFit: (scaleInstance: any) => {
+                            scaleInstance.width = 35;
+                        }
+                    }
+                }
+            };
+
+            return (
+                <>
+                    <div className="frequency-panel-header">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div>
+                                <div className="frequency-panel-title">
+                                    {freq.route_short_name} - {freq.route_long_name}
+                                </div>
+                                <div className="frequency-panel-subtitle">
+                                    {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
+                                </div>
+                            </div>
+                            <button
+                                className="frequency-close-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (activeFrequencyRouteId) {
+                                        setDismissedFrequencyRouteId(activeFrequencyRouteId);
+                                    }
+                                    setHoveredFrequencyRoute(null);
+                                }}
+                                aria-label="Close details"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="frequency-stats">
+                        <div className="frequency-stat">
+                            <div className="frequency-stat-label">{t.avgFrequency}</div>
+                            <div className="frequency-stat-value">
+                                {freq.avg_headway_minutes.toFixed(1)}
+                                <span className="frequency-stat-unit"> min</span>
+                            </div>
+                        </div>
+                        <div className="frequency-stat">
+                            <div className="frequency-stat-label">{t.dailyTrips}</div>
+                            <div className="frequency-stat-value">
+                                {freq.num_trips}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="frequency-chart">
+                        <div className="frequency-chart-title">{t.busesPerHour}</div>
+                        <div className="frequency-chart-canvas">
+                            <Bar data={chartData} options={chartOptions} />
+                        </div>
+                    </div>
+
+                    <div className="frequency-note">
+                        <span className="frequency-note-italic">{t.frequencyNote}</span>
+                    </div>
+                </>
+            );
+        })()
+        : null;
+
     return (
         <div className="app-container">
-            {/* Small Screen Warning */}
-            <div className="small-screen-warning">
-                <p>{t.smallScreenWarning}</p>
-            </div>
+            <img
+                src={`${import.meta.env.BASE_URL}PDP_logo_mobile.png`}
+                alt="¿Por Dónde Pasa?"
+                className="mobile-logo"
+            />
 
-            <div className="sidebar">
+            <div className={`sidebar ${isMobilePanelOpen ? 'mobile-open' : ''}`}>
+                <div
+                    className="mobile-drag-handle"
+                    onClick={toggleMobilePanel}
+                    onTouchEnd={(e) => {
+                        if (e.cancelable) {
+                            e.preventDefault();
+                        }
+                        toggleMobilePanel();
+                    }}
+                    role="button"
+                    aria-label="Toggle menu"
+                >
+                    <div className="handle-bar" />
+                </div>
+
                 <div className="sidebar-header">
                     <img src={`${import.meta.env.BASE_URL}PDP_logo.png`} alt="¿Por Dónde Pasa?" className="logo" />
                 </div>
 
+                {/* Section: Selected Routes (Conditional on Selection Existence) */}
+                {selectedRoutesList.length > 0 && (
+                    <>
+                        <div className="section-header" style={{ cursor: 'default', background: '#f0f7ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ color: '#333' }}>{t.selectedRoutes} ({selectedRoutesList.length})</h3>
+                            <button
+                                className="clear-button-inline"
+                                onClick={clearSelection}
+                                aria-label={t.clearSelection}
+                            >
+                                {t.clearSelection}
+                            </button>
+                        </div>
+                        <ul className="route-list" style={{ flex: 1, overflowY: 'auto' }}>
+                            {selectedRoutesList.map((r) => renderRouteItem(r, true, true))}
+                        </ul>
+                    </>
+                )}
+
+                {/* Mobile Frequency Panel Section (below Selected Routes) */}
+                {frequencyPanelContent && (
+                    <div className="frequency-section mobile-only">
+                        <div className="frequency-panel frequency-panel-inline">
+                            {frequencyPanelContent}
+                        </div>
+                    </div>
+                )}
+
                 {/* Section: Routes by Stops */}
                 <div
                     className="section-header"
-                    onClick={() => setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded)}
+                    onClick={() => {
+                        const next = !isRoutesByStopsExpanded;
+                        setIsRoutesByStopsExpanded(next);
+                        if (next) {
+                            setIsMobilePanelOpen(true);
+                        }
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            setIsRoutesByStopsExpanded(!isRoutesByStopsExpanded);
+                            const next = !isRoutesByStopsExpanded;
+                            setIsRoutesByStopsExpanded(next);
+                            if (next) {
+                                setIsMobilePanelOpen(true);
+                            }
                         }
                     }}
                     aria-expanded={isRoutesByStopsExpanded}
@@ -738,35 +971,26 @@ function App() {
                     </>
                 )}
 
-                {/* Section: Selected Routes (Conditional on Selection Existence) */}
-                {selectedRoutesList.length > 0 && (
-                    <>
-                        <div className="section-header" style={{ cursor: 'default', background: '#f0f7ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ color: '#333' }}>{t.selectedRoutes} ({selectedRoutesList.length})</h3>
-                            <button
-                                className="clear-button-inline"
-                                onClick={clearSelection}
-                                aria-label={t.clearSelection}
-                            >
-                                {t.clearSelection}
-                            </button>
-                        </div>
-                        <ul className="route-list" style={{ flex: 1, overflowY: 'auto' }}>
-                            {selectedRoutesList.map((r) => renderRouteItem(r, true, true))}
-                        </ul>
-                    </>
-                )}
-
                 {/* Section: All Services */}
                 <div
                     className="section-header"
-                    onClick={() => setIsAllServicesExpanded(!isAllServicesExpanded)}
+                    onClick={() => {
+                        const next = !isAllServicesExpanded;
+                        setIsAllServicesExpanded(next);
+                        if (next) {
+                            setIsMobilePanelOpen(true);
+                        }
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            setIsAllServicesExpanded(!isAllServicesExpanded);
+                            const next = !isAllServicesExpanded;
+                            setIsAllServicesExpanded(next);
+                            if (next) {
+                                setIsMobilePanelOpen(true);
+                            }
                         }
                     }}
                     aria-expanded={isAllServicesExpanded}
@@ -822,19 +1046,26 @@ function App() {
             <div className="map-wrapper" style={{ position: 'relative', flex: 1 }}>
                 <div className="map-container" ref={mapContainer} />
 
+                {/* Mobile About Button (Below Logo) */}
+                <button
+                    className="floating-about-btn mobile-left-position"
+                    onClick={() => setShowAbout(true)}
+                    aria-label={t.aboutButton}
+                >
+                    ?
+                </button>
+
                 {/* Controls Container */}
-                <div style={{ position: 'absolute', top: '20px', right: '60px', zIndex: 1000, display: 'flex', gap: '10px' }}>
+                <div className="map-controls-group">
                     <button
                         className="theme-button"
-                        style={{ position: 'static' }}
                         onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
                         aria-label={`Switch to ${lang === 'es' ? 'English' : 'Spanish'}`}
                     >
-                        {t.langLabel}
+                        {lang === 'es' ? 'EN' : 'ES'}
                     </button>
                     <button
                         className="theme-button"
-                        style={{ position: 'static' }}
                         onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                         aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
                     >
@@ -867,122 +1098,10 @@ function App() {
                     </div>
                 )}
 
-                {/* Frequency Panel */}
-                {hoveredFrequencyRoute && frequencies[hoveredFrequencyRoute] && (
-                    <div className="frequency-panel">
-                        {(() => {
-                            const freq = frequencies[hoveredFrequencyRoute];
-
-                            // Check if route has valid frequency data
-                            if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
-                                return null;
-                            }
-
-                            // Prepare data for Chart.js
-                            const chartData = {
-                                labels: freq.hourly_profile.map(h => h.hour.toString()),
-                                datasets: [
-                                    {
-                                        data: freq.hourly_profile.map(h => h.buses_per_hour),
-                                        backgroundColor: 'rgba(0, 191, 255, 0.7)', // deepskyblue2
-                                        borderWidth: 0,
-                                        borderRadius: 2,
-                                    }
-                                ]
-                            };
-
-                            const chartOptions = {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: false
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            label: (context: any) => {
-                                                return `${context.parsed.y.toFixed(1)} buses/hr`;
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        grid: {
-                                            display: false
-                                        },
-                                        ticks: {
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            callback: function (_value: any, index: number) {
-                                                const hour = freq.hourly_profile[index]?.hour;
-                                                return hour && hour % 4 === 0 ? hour : '';
-                                            },
-                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
-                                            font: {
-                                                size: 11
-                                            }
-                                        }
-                                    },
-                                    y: {
-                                        beginAtZero: true,
-                                        grid: {
-                                            color: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-                                        },
-                                        ticks: {
-                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
-                                            font: {
-                                                size: 11
-                                            },
-                                            maxTicksLimit: 6
-                                        },
-                                        afterFit: (scaleInstance: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-                                            scaleInstance.width = 35;
-                                        }
-                                    }
-                                }
-                            };
-
-                            return (
-                                <>
-                                    <div className="frequency-panel-header">
-                                        <div className="frequency-panel-title">
-                                            {freq.route_short_name} - {freq.route_long_name}
-                                        </div>
-                                        <div className="frequency-panel-subtitle">
-                                            {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-stats">
-                                        <div className="frequency-stat">
-                                            <div className="frequency-stat-label">{t.avgFrequency}</div>
-                                            <div className="frequency-stat-value">
-                                                {freq.avg_headway_minutes.toFixed(1)}
-                                                <span className="frequency-stat-unit"> min</span>
-                                            </div>
-                                        </div>
-                                        <div className="frequency-stat">
-                                            <div className="frequency-stat-label">{t.dailyTrips}</div>
-                                            <div className="frequency-stat-value">
-                                                {freq.num_trips}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-chart">
-                                        <div className="frequency-chart-title">{t.busesPerHour}</div>
-                                        <div className="frequency-chart-canvas">
-                                            <Bar data={chartData} options={chartOptions} />
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-note">
-                                        <span className="frequency-note-italic">{t.frequencyNote}</span>
-                                    </div>
-                                </>
-                            );
-                        })()}
+                {/* Frequency Panel (Desktop Floating) */}
+                {frequencyPanelContent && (
+                    <div className="frequency-panel frequency-panel-floating desktop-only">
+                        {frequencyPanelContent}
                     </div>
                 )}
             </div>
