@@ -72,6 +72,7 @@ function App() {
     const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(new Set());
     const [, setSelectedStop] = useState<Stop | null>(null);
     const [hoveredFrequencyRoute, setHoveredFrequencyRoute] = useState<string | null>(null);
+    const [dismissedFrequencyRouteId, setDismissedFrequencyRouteId] = useState<string | null>(null);
 
     const [isAllServicesExpanded, setIsAllServicesExpanded] = useState<boolean>(false);
     const [isRoutesByStopsExpanded, setIsRoutesByStopsExpanded] = useState<boolean>(false);
@@ -518,7 +519,6 @@ function App() {
 
     const handleSidebarSelect = (routeId: string) => {
         resetMapHover();
-        setMarkerLocation(null);
         setSidebarHoveredId(null);
         setSelectedStop(null);
         clearStopFromURL();
@@ -612,6 +612,18 @@ function App() {
 
     // Determine which route to show frequency for: Hover takes precedence, then single selection
     const activeFrequencyRouteId = hoveredFrequencyRoute || (selectedRouteIds.size === 1 ? Array.from(selectedRouteIds)[0] : null);
+    const isFrequencyPanelVisible = !!activeFrequencyRouteId && activeFrequencyRouteId !== dismissedFrequencyRouteId;
+
+    useEffect(() => {
+        if (!activeFrequencyRouteId) {
+            setDismissedFrequencyRouteId(null);
+            return;
+        }
+
+        if (dismissedFrequencyRouteId && activeFrequencyRouteId !== dismissedFrequencyRouteId) {
+            setDismissedFrequencyRouteId(null);
+        }
+    }, [activeFrequencyRouteId, dismissedFrequencyRouteId]);
 
     const renderRouteItem = (route: RouteMeta, isCompact: boolean, showDot: boolean = true) => {
         const isSelected = selectedRouteIds.has(route.route_id);
@@ -686,6 +698,140 @@ function App() {
         });
     }, []);
 
+    const frequencyPanelContent = isFrequencyPanelVisible && activeFrequencyRouteId && frequencies[activeFrequencyRouteId]
+        ? (() => {
+            const freq = frequencies[activeFrequencyRouteId];
+
+            // Check if route has valid frequency data
+            if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
+                return null;
+            }
+
+            // Prepare data for Chart.js
+            const chartData = {
+                labels: freq.hourly_profile.map(h => h.hour.toString()),
+                datasets: [
+                    {
+                        data: freq.hourly_profile.map(h => h.buses_per_hour),
+                        backgroundColor: 'rgba(0, 191, 255, 0.7)', // deepskyblue2
+                        borderWidth: 0,
+                        borderRadius: 2,
+                    }
+                ]
+            };
+
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            label: (context: any) => {
+                                return `${context.parsed.y.toFixed(1)} buses/hr`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            callback: function (_value: any, index: number) {
+                                const hour = freq.hourly_profile[index]?.hour;
+                                return hour && hour % 4 === 0 ? hour : '';
+                            },
+                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                        },
+                        ticks: {
+                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+                            font: {
+                                size: 11
+                            },
+                            maxTicksLimit: 6
+                        },
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        afterFit: (scaleInstance: any) => {
+                            scaleInstance.width = 35;
+                        }
+                    }
+                }
+            };
+
+            return (
+                <>
+                    <div className="frequency-panel-header">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                            <div>
+                                <div className="frequency-panel-title">
+                                    {freq.route_short_name} - {freq.route_long_name}
+                                </div>
+                                <div className="frequency-panel-subtitle">
+                                    {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
+                                </div>
+                            </div>
+                            <button
+                                className="frequency-close-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (activeFrequencyRouteId) {
+                                        setDismissedFrequencyRouteId(activeFrequencyRouteId);
+                                    }
+                                    setHoveredFrequencyRoute(null);
+                                }}
+                                aria-label="Close details"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="frequency-stats">
+                        <div className="frequency-stat">
+                            <div className="frequency-stat-label">{t.avgFrequency}</div>
+                            <div className="frequency-stat-value">
+                                {freq.avg_headway_minutes.toFixed(1)}
+                                <span className="frequency-stat-unit"> min</span>
+                            </div>
+                        </div>
+                        <div className="frequency-stat">
+                            <div className="frequency-stat-label">{t.dailyTrips}</div>
+                            <div className="frequency-stat-value">
+                                {freq.num_trips}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="frequency-chart">
+                        <div className="frequency-chart-title">{t.busesPerHour}</div>
+                        <div className="frequency-chart-canvas">
+                            <Bar data={chartData} options={chartOptions} />
+                        </div>
+                    </div>
+
+                    <div className="frequency-note">
+                        <span className="frequency-note-italic">{t.frequencyNote}</span>
+                    </div>
+                </>
+            );
+        })()
+        : null;
+
     return (
         <div className="app-container">
             <img
@@ -699,7 +845,9 @@ function App() {
                     className="mobile-drag-handle"
                     onClick={toggleMobilePanel}
                     onTouchEnd={(e) => {
-                        e.preventDefault();
+                        if (e.cancelable) {
+                            e.preventDefault();
+                        }
                         toggleMobilePanel();
                     }}
                     role="button"
@@ -729,6 +877,15 @@ function App() {
                             {selectedRoutesList.map((r) => renderRouteItem(r, true, true))}
                         </ul>
                     </>
+                )}
+
+                {/* Mobile Frequency Panel Section (below Selected Routes) */}
+                {frequencyPanelContent && (
+                    <div className="frequency-section mobile-only">
+                        <div className="frequency-panel frequency-panel-inline">
+                            {frequencyPanelContent}
+                        </div>
+                    </div>
                 )}
 
                 {/* Section: Routes by Stops */}
@@ -941,141 +1098,10 @@ function App() {
                     </div>
                 )}
 
-                {/* Frequency Panel */}
-                {activeFrequencyRouteId && frequencies[activeFrequencyRouteId] && (
-                    <div className="frequency-panel">
-                        {(() => {
-                            const freq = frequencies[activeFrequencyRouteId];
-
-                            // Check if route has valid frequency data
-                            if (!freq.hourly_profile || freq.hourly_profile.length === 0) {
-                                return null;
-                            }
-
-                            // Prepare data for Chart.js
-                            const chartData = {
-                                labels: freq.hourly_profile.map(h => h.hour.toString()),
-                                datasets: [
-                                    {
-                                        data: freq.hourly_profile.map(h => h.buses_per_hour),
-                                        backgroundColor: 'rgba(0, 191, 255, 0.7)', // deepskyblue2
-                                        borderWidth: 0,
-                                        borderRadius: 2,
-                                    }
-                                ]
-                            };
-
-                            const chartOptions = {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: false
-                                    },
-                                    tooltip: {
-                                        callbacks: {
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            label: (context: any) => {
-                                                return `${context.parsed.y.toFixed(1)} buses/hr`;
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        grid: {
-                                            display: false
-                                        },
-                                        ticks: {
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            callback: function (_value: any, index: number) {
-                                                const hour = freq.hourly_profile[index]?.hour;
-                                                return hour && hour % 4 === 0 ? hour : '';
-                                            },
-                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
-                                            font: {
-                                                size: 11
-                                            }
-                                        }
-                                    },
-                                    y: {
-                                        beginAtZero: true,
-                                        grid: {
-                                            color: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-                                        },
-                                        ticks: {
-                                            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
-                                            font: {
-                                                size: 11
-                                            },
-                                            maxTicksLimit: 6
-                                        },
-                                        afterFit: (scaleInstance: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-                                            scaleInstance.width = 35;
-                                        }
-                                    }
-                                }
-                            };
-
-                            return (
-                                <>
-                                    <div className="frequency-panel-header">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                            <div>
-                                                <div className="frequency-panel-title">
-                                                    {freq.route_short_name} - {freq.route_long_name}
-                                                </div>
-                                                <div className="frequency-panel-subtitle">
-                                                    {freq.first_departure.slice(0, 5)} - {freq.last_departure.slice(0, 5)}
-                                                </div>
-                                            </div>
-                                            <button
-                                                className="frequency-close-btn"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setHoveredFrequencyRoute(null);
-                                                    if (selectedRouteIds.size === 1) {
-                                                        setSelectedRouteIds(new Set());
-                                                        setMarkerLocation(null);
-                                                        clearStopFromURL();
-                                                    }
-                                                }}
-                                                aria-label="Close details"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-stats">
-                                        <div className="frequency-stat">
-                                            <div className="frequency-stat-label">{t.avgFrequency}</div>
-                                            <div className="frequency-stat-value">
-                                                {freq.avg_headway_minutes.toFixed(1)}
-                                                <span className="frequency-stat-unit"> min</span>
-                                            </div>
-                                        </div>
-                                        <div className="frequency-stat">
-                                            <div className="frequency-stat-label">{t.dailyTrips}</div>
-                                            <div className="frequency-stat-value">
-                                                {freq.num_trips}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-chart">
-                                        <div className="frequency-chart-title">{t.busesPerHour}</div>
-                                        <div className="frequency-chart-canvas">
-                                            <Bar data={chartData} options={chartOptions} />
-                                        </div>
-                                    </div>
-
-                                    <div className="frequency-note">
-                                        <span className="frequency-note-italic">{t.frequencyNote}</span>
-                                    </div>
-                                </>
-                            );
-                        })()}
+                {/* Frequency Panel (Desktop Floating) */}
+                {frequencyPanelContent && (
+                    <div className="frequency-panel frequency-panel-floating desktop-only">
+                        {frequencyPanelContent}
                     </div>
                 )}
             </div>

@@ -1032,19 +1032,41 @@ button:focus:not(:focus-visible) {
 
 /* Frequency Panel */
 .frequency-panel {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  width: 320px;
   background: rgba(250, 250, 250, 0.70);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: var(--space-lg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  pointer-events: none;
   animation: fadeIn 0.2s ease-out;
   backdrop-filter: blur(8px);
+}
+
+.frequency-panel-floating {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 320px;
+  pointer-events: auto;
+}
+
+.frequency-panel-inline {
+  position: static;
+  width: 100%;
+  pointer-events: auto;
+  box-shadow: none;
+}
+
+.frequency-section {
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none;
 }
 
 [data-theme='dark'] .frequency-panel {
@@ -1140,9 +1162,18 @@ button:focus:not(:focus-visible) {
 
 @media (max-width: 768px) {
   .frequency-panel {
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
     width: auto;
+  }
+
+  .frequency-panel-floating {
+    display: none;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
   }
 }
